@@ -11,32 +11,56 @@ info:
     url: http://www.apache.org/licenses/LICENSE-2.0.html
 basePath: /v1
 paths:
-  /default/get/{id}:
+  /evaluacion/{vigencia}/{plan}/{periodo}:
     get:
       tags:
-      - default
-      description: create Get
-      operationId: MainController.Get
+      - evaluacion
+      description: get Evaluacion
+      operationId: EvaluacionController.Evaluacion
       parameters:
-      - in: query
-        name: id
-        description: id
+      - in: path
+        name: vigencia
+        description: The key for staticblock
+        required: true
+        type: string
+      - in: path
+        name: plan
+        description: The key for staticblock
+        required: true
+        type: string
+      - in: path
+        name: periodo
+        description: The key for staticblock
         required: true
         type: string
       responses:
-        "201":
+        "200":
           description: ""
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/models.Default'
-        "403":
-          description: body is empty
-definitions:
-  models.Default:
-    title: Default
-    type: object
-    properties:
-      Id:
-        type: integer
-        format: int64
+        "404":
+          description: ""
+  /evaluacion/planes_periodo/{vigencia}/{unidad}:
+    get:
+      tags:
+      - evaluacion
+      description: get Planes y vigencias para la unidad y vigencia dado
+      operationId: EvaluacionController.PlanesPeriodo
+      parameters:
+      - in: path
+        name: vigencia
+        description: The key for staticblock
+        required: true
+        type: string
+      - in: path
+        name: unidad
+        description: The key for staticblock
+        required: true
+        type: string
+      responses:
+        "200":
+          description: ""
+        "404":
+          description: ""
+tags:
+- name: evaluacion
+  description: |
+    EvaluacionController operations for Evaluacion

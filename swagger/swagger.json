@@ -15,49 +15,84 @@
     },
     "basePath": "/v1",
     "paths": {
-        "/default/get/{id}": {
+        "/evaluacion/planes_periodo/{vigencia}/{unidad}": {
             "get": {
                 "tags": [
-                    "default"
+                    "evaluacion"
                 ],
-                "description": "create Get",
-                "operationId": "MainController.Get",
+                "description": "get Planes y vigencias para la unidad y vigencia dado",
+                "operationId": "EvaluacionController.PlanesPeriodo",
                 "parameters": [
                     {
-                        "in": "query",
-                        "name": "id",
-                        "description": "id",
+                        "in": "path",
+                        "name": "vigencia",
+                        "description": "The key for staticblock",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "path",
+                        "name": "unidad",
+                        "description": "The key for staticblock",
                         "required": true,
                         "type": "string"
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.Default"
-                            }
-                        }
+                    "200": {
+                        "description": ""
                     },
-                    "403": {
-                        "description": "body is empty"
+                    "404": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/evaluacion/{vigencia}/{plan}/{periodo}": {
+            "get": {
+                "tags": [
+                    "evaluacion"
+                ],
+                "description": "get Evaluacion",
+                "operationId": "EvaluacionController.Evaluacion",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "vigencia",
+                        "description": "The key for staticblock",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "path",
+                        "name": "plan",
+                        "description": "The key for staticblock",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "path",
+                        "name": "periodo",
+                        "description": "The key for staticblock",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "404": {
+                        "description": ""
                     }
                 }
             }
         }
     },
-    "definitions": {
-        "models.Default": {
-            "title": "Default",
-            "type": "object",
-            "properties": {
-                "Id": {
-                    "type": "integer",
-                    "format": "int64"
-                }
-            }
+    "tags": [
+        {
+            "name": "evaluacion",
+            "description": "EvaluacionController operations for Evaluacion\n"
         }
-    }
+    ]
 }
