@@ -15,7 +15,7 @@
     },
     "basePath": "/v1",
     "paths": {
-        "/evaluacion/planes_periodo/{vigencia}/{unidad}": {
+        "/evaluacion/planes-periodo/{vigencia}/{unidad}": {
             "get": {
                 "tags": [
                     "evaluacion"

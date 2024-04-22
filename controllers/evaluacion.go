@@ -2,8 +2,10 @@ package controllers
 
 import (
 	"github.com/astaxie/beego"
-	"github.com/udistrital/planeacion_evaluacion_mid/helpers"
-	"github.com/udistrital/utils_oas/request"
+	evaluacionhelper "github.com/udistrital/planeacion_evaluacion_mid/helpers"
+	"github.com/udistrital/planeacion_evaluacion_mid/services"
+	"github.com/udistrital/utils_oas/errorhandler"
+	"github.com/udistrital/utils_oas/requestresponse"
 )
 
 // EvaluacionController operations for Evaluacion
@@ -13,42 +15,42 @@ type EvaluacionController struct {
 
 // URLMapping ...
 func (c *EvaluacionController) URLMapping() {
-	c.Mapping("GetEvaluacion", c.GetEvaluacion)
 	c.Mapping("GetPlanesPeriodo", c.GetPlanesPeriodo)
+	c.Mapping("GetEvaluacion", c.GetEvaluacion)
+	c.Mapping("PlanesAEvaluar", c.PlanesAEvaluar)
+	c.Mapping("Unidades", c.Unidades)
+	c.Mapping("Avances", c.Avances)
 }
 
-// PlanesPeriodo ...
-// @Title PlanesPeriodo
+// GetPlanesPeriodo ...
+// @Title GetPlanesPeriodo
 // @Description get Planes y vigencias para la unidad y vigencia dado
 // @Param	vigencia 	path 	string	true		"The key for staticblock"
 // @Param	unidad 		path 	string	true		"The key for staticblock"
 // @Success 200
 // @Failure 404
-// @router /planes_periodo/:vigencia/:unidad [get]
+// @router /planes-periodo/:vigencia/:unidad [get]
 func (c *EvaluacionController) GetPlanesPeriodo() {
-
-	defer request.ErrorController(c.Controller, "EvaluacionController")
+	defer errorhandler.HandlePanic(&c.Controller)
 
 	vigencia := c.Ctx.Input.Param(":vigencia")
 	unidad := c.Ctx.Input.Param(":unidad")
 
-	if len(vigencia) == 0 || len(unidad) == 0 {
-		c.Data["json"] = map[string]interface{}{"Success": false, "Status": "404", "Message": "Request contains incorrect params", "Data": nil}
-		c.ServeJSON()
-		return
-	}
+	resultado, err := services.GetPlanesPeriodo(vigencia, unidad)
 
-	if data, err := helpers.PlanDetalle(vigencia, unidad); err == nil {
-		c.Data["json"] = map[string]interface{}{"Success": true, "Status": "200", "Message": "Successful", "Data": data}
+	if err == nil {
+		c.Ctx.Output.SetStatus(200)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 200, resultado)
 	} else {
-		panic(map[string]interface{}{"Success": false, "Status": "400", "Message": "Error in GetPlanesPeriodo", "Data": nil, "Error": err})
+		c.Ctx.Output.SetStatus(404)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 404, nil, err.Error())
 	}
 
 	c.ServeJSON()
 }
 
-// Evaluacion ...
-// @Title Evaluacion
+// GetEvaluacion ...
+// @Title GetEvaluacion
 // @Description get Evaluacion
 // @Param	vigencia 	path 	string	true		"The key for staticblock"
 // @Param	plan 		path 	string	true		"The key for staticblock"
@@ -57,23 +59,92 @@ func (c *EvaluacionController) GetPlanesPeriodo() {
 // @Failure 404
 // @router /:vigencia/:plan:/:periodo [get]
 func (c *EvaluacionController) GetEvaluacion() {
-
-	defer request.ErrorController(c.Controller, "EvaluacionController")
+	defer errorhandler.HandlePanic(&c.Controller)
 
 	vigencia := c.Ctx.Input.Param(":vigencia")
 	plan := c.Ctx.Input.Param(":plan")
 	periodoId := c.Ctx.Input.Param(":periodo")
 
-	if len(vigencia) == 0 || len(plan) == 0 || len(periodoId) == 0 {
-		c.Data["json"] = map[string]interface{}{"Success": false, "Status": "404", "Message": "Request containt incorrect params", "Data": nil}
-		c.ServeJSON()
-		return
+	resultado, err := services.GetEvaluacion(vigencia, plan, periodoId)
+
+	if err == nil {
+		c.Ctx.Output.SetStatus(200)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 200, resultado)
+	} else {
+		c.Ctx.Output.SetStatus(404)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 404, nil, err.Error())
 	}
 
-	if data, err := helpers.EvaluacionDetalle(vigencia, plan, periodoId); err == nil {
-		c.Data["json"] = map[string]interface{}{"Success": true, "Status": "200", "Message": "Successful", "Data": data}
+	c.ServeJSON()
+}
+
+// Get Planes A Evaluar ...
+// @Title GetPlanesAEvaluar
+// @Description get Planes que se pueden evaluar
+// @Success 200
+// @Failure 404
+// @router /planes/ [get]
+func (c *EvaluacionController) PlanesAEvaluar() {
+	defer errorhandler.HandlePanic(&c.Controller)
+
+	if datos, err := evaluacionhelper.GetPlanesParaEvaluar(); err == nil {
+		c.Data["json"] = map[string]interface{}{"Success": true, "Status": "200", "Message": "Successful", "Data": datos}
 	} else {
-		panic(map[string]interface{}{"Success": false, "Status": "400", "Message": "Error in GetEvaluacion", "Data": nil, "Error": err})
+		panic(map[string]interface{}{"funcion": "PlanesAEvaluar", "err": err, "status": "404", "message": "Error obteniendo los planes a evaluar"})
+	}
+	c.ServeJSON()
+}
+
+// Get Unidades ...
+// @Title GetUnidades
+// @Description get Unidades
+// @Param	plan 		path 	string	true		"The key for staticblock"
+// @Param	vigencia 	path 	string	true		"The key for staticblock"
+// @Success 200
+// @Failure 404
+// @router /unidades/:plan:/:vigencia [get]
+func (c *EvaluacionController) Unidades() {
+	defer errorhandler.HandlePanic(&c.Controller)
+
+	plan := c.Ctx.Input.Param(":plan")
+	vigencia := c.Ctx.Input.Param(":vigencia")
+
+	resultado, err := services.Unidades(plan, vigencia)
+
+	if err == nil {
+		c.Ctx.Output.SetStatus(200)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 200, resultado)
+	} else {
+		c.Ctx.Output.SetStatus(404)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 404, nil, err.Error())
+	}
+	c.ServeJSON()
+}
+
+// Get Avance ...
+// @Title GetAvance
+// @Description get Avance de Unidad
+// @Param	plan 		path 	string	true		"The key for staticblock"
+// @Param	vigencia 	path 	string	true		"The key for staticblock"
+// @Param	unidad 	path 	string	true		"The key for staticblock"
+// @Success 200
+// @Failure 404
+// @router /avance/:plan:/:vigencia/:unidad [get]
+func (c *EvaluacionController) Avances() {
+	defer errorhandler.HandlePanic(&c.Controller)
+
+	plan := c.Ctx.Input.Param(":plan")
+	vigencia := c.Ctx.Input.Param(":vigencia")
+	unidad := c.Ctx.Input.Param(":unidad")
+
+	resultado, err := services.Avances(plan, vigencia, unidad)
+
+	if err == nil {
+		c.Ctx.Output.SetStatus(200)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 200, resultado)
+	} else {
+		c.Ctx.Output.SetStatus(404)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 404, nil, err.Error())
 	}
 
 	c.ServeJSON()

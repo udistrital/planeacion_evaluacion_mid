@@ -48,7 +48,7 @@ steps:
     - push
 
 - name: go_build
-  image: golang:1.17
+  image: golang:1.18
   commands:
   - go mod init
   - go get -t
@@ -63,7 +63,7 @@ steps:
     - push
 
 # - name: go_run_test
-#   image: golang:1.14
+#   image: golang:1.18
 #   commands:
 #   - go get -t
 #   - go get github.com/smartystreets/goconvey/convey

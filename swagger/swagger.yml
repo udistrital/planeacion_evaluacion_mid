@@ -38,7 +38,7 @@ paths:
           description: ""
         "404":
           description: ""
-  /evaluacion/planes_periodo/{vigencia}/{unidad}:
+  /evaluacion/planes-periodo/{vigencia}/{unidad}:
     get:
       tags:
       - evaluacion
@@ -64,3 +64,4 @@ tags:
 - name: evaluacion
   description: |
     EvaluacionController operations for Evaluacion
+
