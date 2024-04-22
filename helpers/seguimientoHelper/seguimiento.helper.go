@@ -508,7 +508,6 @@ func GetRespuestaAnterior(dataSeg map[string]interface{}, index int, respuestas 
 					helpers.LimpiezaRespuestaRefactor(resPeriodo, &periodo)
 					tri, _ := strconv.Atoi(string(trimestre[1]))
 					segTrimestre, _ := strconv.Atoi(string(periodo[0]["ParametroId"].(map[string]interface{})["CodigoAbreviacion"].(string)[1]))
-
 					if (tri - 1) == segTrimestre {
 						if seguimiento["dato"] != "{}" {
 							dato := make(map[string]interface{})
