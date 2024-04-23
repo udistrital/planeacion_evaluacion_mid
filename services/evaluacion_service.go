@@ -154,7 +154,7 @@ func Avances(plan string, vigencia string, unidad string) (interface{}, error) {
 		if data, err2 := evaluacionhelper.GetAvances(nombrePlan, vigencia, unidad); err2 == nil {
 			return data, nil
 		} else {
-			return nil, errors.New("Error obteniendo los avances " + err1.Error())
+			return nil, errors.New("Error obteniendo los avances ")
 		}
 	} else {
 		return nil, errors.New("Error obteniendo los avances " + err1.Error())
