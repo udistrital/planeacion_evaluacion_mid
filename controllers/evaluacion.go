@@ -95,6 +95,7 @@ func (c *EvaluacionController) PlanesAEvaluar() {
 		c.Ctx.Output.SetStatus(404)
 		c.Data["json"] = requestresponse.APIResponseDTO(true, 404, nil, err.Error())
 	}
+	c.ServeJSON()
 }
 
 // Get Unidades ...
