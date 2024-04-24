@@ -87,6 +87,16 @@ func (c *EvaluacionController) GetEvaluacion() {
 func (c *EvaluacionController) PlanesAEvaluar() {
 	defer errorhandler.HandlePanic(&c.Controller)
 
+	resultado, err := services.PlanesAEvaluar()
+
+	if err == nil {
+		c.Ctx.Output.SetStatus(200)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 200, resultado)
+	} else {
+		c.Ctx.Output.SetStatus(404)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 404, nil, err.Error())
+	}
+
 	if datos, err := evaluacionhelper.GetPlanesParaEvaluar(); err == nil {
 		c.Data["json"] = map[string]interface{}{"Success": true, "Status": "200", "Message": "Successful", "Data": datos}
 	} else {

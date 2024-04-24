@@ -46,8 +46,15 @@ func GetPlanesPeriodo(vigencia string, unidad string) (respuesta []map[string]in
 			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 			return nil, outputError
 		}
-		periodos := evaluacionhelper.GetPeriodos(vigencia)
-		trimestres := evaluacionhelper.GetTrimestres(vigencia)
+		periodos, err := evaluacionhelper.GetPeriodos(vigencia)
+		if err != nil {
+			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
+		}
+		trimestres, err := evaluacionhelper.GetTrimestres(vigencia)
+		if err != nil {
+			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
+		}
+
 		for _, plan := range planes {
 			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=tipo_seguimiento_id:61f236f525e40c582a0840d0,estado_seguimiento_id:622ba49216511e93a95c326d,plan_id:`+plan["_id"].(string), &resSeguimiento); err == nil {
 				seguimientos := make([]map[string]interface{}, 1)
@@ -109,7 +116,10 @@ func GetEvaluacion(vigencia string, plan string, periodoId string) (interface{},
 		return nil, errors.New("error al decodificar el cuerpo de la solicitud: 404")
 	}
 
-	trimestres := evaluacionhelper.GetPeriodos(vigencia)
+	trimestres, err := evaluacionhelper.GetPeriodos(vigencia)
+	if err != nil {
+		return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
+	}
 
 	if len(trimestres) == 0 {
 		return nil, nil
@@ -127,19 +137,10 @@ func GetEvaluacion(vigencia string, plan string, periodoId string) (interface{},
 }
 
 func Unidades(plan string, vigencia string) (interface{}, error) {
-	// Imprimir los parámetros recibidos
-	fmt.Println("Plan recibido en service:", plan)
-	fmt.Println("Vigencia recibida en service:", vigencia)
 	if nombrePlan, err := url.QueryUnescape(plan); err == nil {
 		if data, err := evaluacionhelper.GetUnidadesPorPlanYVigencia(nombrePlan, vigencia); err == nil {
-			fmt.Println("Plan recibido en service dentro de la funcion GetUnidadesPorPlanYVigencia:", plan)
-			fmt.Println("Plan recibido en service dentro de la funcion GetUnidadesPorPlanYVigencia:", nombrePlan)
-			fmt.Println("Vigencia recibida en service dentro de la funcion GetUnidadesPorPlanYVigencia:", vigencia)
 			return data, nil
 		} else {
-			fmt.Println("Plan recibido dentro del else:", plan)
-			fmt.Println("Plan recibido dentro del else:", nombrePlan)
-			fmt.Println("Vigencia recibida dentro del else:", vigencia)
 			return nil, errors.New("Error obteniendo las unidades del plan y la vigencia dados ")
 		}
 	} else {
@@ -159,4 +160,57 @@ func Avances(plan string, vigencia string, unidad string) (interface{}, error) {
 	} else {
 		return nil, errors.New("Error obteniendo los avances " + err1.Error())
 	}
+}
+
+func PlanesAEvaluar() (planes []string, outputError error) {
+	defer func() {
+		if err := recover(); err != nil {
+			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
+		}
+	}()
+
+	var respuestaEstado map[string]interface{}
+	var respuestaTipoSeguimiento map[string]interface{}
+	var respuestaSeguimiento map[string]interface{}
+
+	var estadoSeguimiento []map[string]interface{}
+	var tipoSeguimiento []map[string]interface{}
+
+	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+"/estado-seguimiento?query=activo:true,codigo_abreviacion:"+ABREVIACION_AVALADO_PARA_SEGUIMIENTO, &respuestaEstado); err != nil {
+		outputError = errors.New("error al decodificar el cuerpo de la solicitud: 404")
+	}
+	request.LimpiezaRespuestaRefactor(respuestaEstado, &estadoSeguimiento)
+
+	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+"/tipo-seguimiento?query=activo:true,codigo_abreviacion:"+ABREVIACION_SEGUIMIENTO_PLAN_ACCION, &respuestaTipoSeguimiento); err != nil {
+		outputError = errors.New("error al decodificar el cuerpo de la solicitud: 404")
+	}
+	request.LimpiezaRespuestaRefactor(respuestaTipoSeguimiento, &tipoSeguimiento)
+
+	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=tipo_seguimiento_id:`+tipoSeguimiento[0]["_id"].(string)+`,estado_seguimiento_id:`+estadoSeguimiento[0]["_id"].(string), &respuestaSeguimiento); err == nil {
+		var seguimientos []map[string]interface{}
+		request.LimpiezaRespuestaRefactor(respuestaSeguimiento, &seguimientos)
+		for _, seguimiento := range seguimientos {
+			// Esta en los planes que ya se trajeron?
+			var respuestaPlan map[string]interface{}
+			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan/`+seguimiento["plan_id"].(string), &respuestaPlan); err == nil {
+				var plan map[string]interface{}
+				existeNombrePlan := false
+				request.LimpiezaRespuestaRefactor(respuestaPlan, &plan)
+				for _, nombre := range planes {
+					if nombre == plan["nombre"].(string) {
+						existeNombrePlan = true
+					}
+				}
+				if !existeNombrePlan {
+					planes = append(planes, plan["nombre"].(string))
+				}
+			} else {
+				outputError = errors.New("error al decodificar el cuerpo de la solicitud: 404")
+			}
+		}
+	} else {
+		outputError = errors.New("error al decodificar el cuerpo de la solicitud: 404")
+
+	}
+	return planes, outputError
 }

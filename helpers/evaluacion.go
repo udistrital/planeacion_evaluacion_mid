@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -47,7 +48,7 @@ func ConvertirStringJson(diccionario map[string]interface{}) map[string]interfac
 	return dicStrings
 }
 
-func GetTrimestres(vigencia string) []map[string]interface{} {
+func GetTrimestres(vigencia string) ([]map[string]interface{}, error) {
 
 	var res map[string]interface{}
 	var trimestre []map[string]interface{}
@@ -72,26 +73,29 @@ func GetTrimestres(vigencia string) []map[string]interface{} {
 					request.LimpiezaRespuestaRefactor(res, &trimestre)
 					trimestres = append(trimestres, trimestre...)
 				} else {
-					panic(map[string]interface{}{"funcion": "GetTrimestres", "err": "Error ", "status": "400", "log": err})
+					return nil, errors.New("error GetTrimestres en la solicitud: " + err.Error())
 				}
 			} else {
-				panic(map[string]interface{}{"funcion": "GetTrimestres", "err": "Error ", "status": "400", "log": err})
+				return nil, errors.New("error GetTrimestres en la solicitud: " + err.Error())
 			}
 		} else {
-			panic(map[string]interface{}{"funcion": "GetTrimestres", "err": "Error ", "status": "400", "log": err})
+			return nil, errors.New("error GetTrimestres en la solicitud: " + err.Error())
 		}
 	} else {
-		panic(map[string]interface{}{"funcion": "GetTrimestres", "err": "Error ", "status": "400", "log": err})
+		return nil, errors.New("error GetTrimestres en la solicitud: " + err.Error())
 	}
-
-	return trimestres
+	return trimestres, nil
 }
 
-func GetPeriodos(vigencia string) []map[string]interface{} {
+func GetPeriodos(vigencia string) ([]map[string]interface{}, error) {
 	var periodos []map[string]interface{}
 	var resPeriodo map[string]interface{}
 	var wg sync.WaitGroup
-	trimestres := GetTrimestres(vigencia)
+	trimestres, err := GetTrimestres(vigencia)
+	if err != nil {
+		return nil, errors.New("error GetTrimestres en la solicitud: " + err.Error())
+	}
+
 	periodosMutex := sync.Mutex{}
 
 	for _, trimestre := range trimestres {
@@ -106,6 +110,8 @@ func GetPeriodos(vigencia string) []map[string]interface{} {
 				var periodo []map[string]interface{}
 				request.LimpiezaRespuestaRefactor(resPeriodo, &periodo)
 				(*periodos) = append((*periodos), periodo...)
+			} else {
+				err = errors.New("error al decodificar el cuerpo de la solicitud")
 			}
 			periodosMutex.Unlock()
 			wg.Done()
@@ -115,7 +121,7 @@ func GetPeriodos(vigencia string) []map[string]interface{} {
 	wg.Wait()
 
 	request.SortSlice(&periodos, "periodo_id")
-	return periodos
+	return periodos, nil
 }
 
 func GetEvaluacionTrimestre(planId string, periodoId string, actividadId string) []map[string]interface{} {
@@ -416,23 +422,14 @@ func GetEvaluacion(planId string, periodos []map[string]interface{}, trimestre i
 	return nil
 }
 
-func GetPlanesPeriodo(unidad string, vigencia string) (respuesta []map[string]interface{}, outputError map[string]interface{}) {
+func GetPlanesPeriodo(unidad string, vigencia string) (respuesta []map[string]interface{}, outputError error) {
 	defer func() {
 		if err := recover(); err != nil {
-			localError := err.(map[string]interface{})
-			outputError = map[string]interface{}{
-				"funcion": "GetPlanesPeriodo",
-				"err":     localError["err"],
-				"status":  localError["status"],
-			}
+			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 			estadoHttp = "404"
-			outputError = map[string]interface{}{
-				"funcion": "GetPlanesPeriodo",
-				"err":     outputError,
-				"status":  estadoHttp,
-			}
 		}
 	}()
+
 	var resPlan map[string]interface{}
 	var resSeguimiento map[string]interface{}
 	respuesta = make([]map[string]interface{}, 0)
@@ -442,15 +439,18 @@ func GetPlanesPeriodo(unidad string, vigencia string) (respuesta []map[string]in
 		request.LimpiezaRespuestaRefactor(resPlan, &planes)
 		// formatdata.JsonPrint(planes)
 		if fmt.Sprintf("%v", planes) == "[]" {
-			outputError = map[string]interface{}{
-				"Parametro": "Plan_id",
-				"err":       "No se tienen planes en seguimiento para la dependencia y la vigencia",
-				"status":    "404",
-			}
+			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
+
 		}
 
-		periodos := GetPeriodos(vigencia)
-		trimestres := GetTrimestres(vigencia)
+		periodos, err := GetPeriodos(vigencia)
+		if err != nil {
+			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
+		}
+		trimestres, err := GetTrimestres(vigencia)
+		if err != nil {
+			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
+		}
 		for _, plan := range planes {
 			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=tipo_seguimiento_id:61f236f525e40c582a0840d0,estado_seguimiento_id:622ba49216511e93a95c326d,plan_id:`+plan["_id"].(string), &resSeguimiento); err == nil {
 				seguimientos := make([]map[string]interface{}, 1)
@@ -488,29 +488,20 @@ func GetPlanesPeriodo(unidad string, vigencia string) (respuesta []map[string]in
 				}
 				respuesta = append(respuesta, map[string]interface{}{"plan": plan["nombre"], "id": plan["_id"], "periodos": periodosSelecionados})
 			} else {
-				outputError = map[string]interface{}{
-					"err":    err,
-					"status": "404",
-				}
+				outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 			}
 		}
 	} else {
-		outputError = map[string]interface{}{
-			"err":    err,
-			"status": "404",
-		}
+		outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 	}
 	return respuesta, outputError
 }
 
-func PlanDetalle(vigencia string, unidad string) (result []map[string]interface{}, outputError map[string]interface{}) {
+func PlanDetalle(vigencia string, unidad string) (result []map[string]interface{}, outputError error) {
 	defer func() {
 		if err := recover(); err != nil {
-			outputError = map[string]interface{}{
-				"function": "PlanDetalle",
-				"err":      err,
-				"status":   estadoHttp,
-			}
+			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
+			estadoHttp = "404"
 		}
 	}()
 
@@ -519,10 +510,7 @@ func PlanDetalle(vigencia string, unidad string) (result []map[string]interface{
 
 	idEstadoPlan, err := getIdCodigoAbreviacion("estado-plan", CodigoEstadoPlan)
 	if err != nil {
-		outputError = map[string]interface{}{
-			"err":    err,
-			"status": estadoHttp,
-		}
+		outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 	}
 
 	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan?query=estado_plan_id:`+idEstadoPlan+`,dependencia_id:`+unidad+`,vigencia:`+vigencia, &resPlan); err == nil {
@@ -530,22 +518,22 @@ func PlanDetalle(vigencia string, unidad string) (result []map[string]interface{
 		request.LimpiezaRespuestaRefactor(resPlan, &planes)
 		if fmt.Sprintf("%v", planes) == "[]" {
 			estadoHttp = "404"
-			outputError = map[string]interface{}{
-				"err":    err,
-				"status": estadoHttp,
-			}
+			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 		}
 
-		periodos := GetPeriodos(vigencia)
-		trimestres := GetTrimestres(vigencia)
+		periodos, err := GetPeriodos(vigencia)
+		if err != nil {
+			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
+		}
+		trimestres, err := GetTrimestres(vigencia)
+		if err != nil {
+			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
+		}
 
 		idEstadoSeguimiento, err1 := getIdCodigoAbreviacion("estado-seguimiento", CodigoEstadoSeguimiento)
 		idTipoSeguimiento, err2 := getIdCodigoAbreviacion("tipo-seguimiento", CodigoTipoSeguimiento)
 		if err1 != nil || err2 != nil {
-			outputError = map[string]interface{}{
-				"err":    err,
-				"status": estadoHttp,
-			}
+			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 		}
 
 		for _, plan := range planes {
@@ -587,18 +575,12 @@ func PlanDetalle(vigencia string, unidad string) (result []map[string]interface{
 				result = append(result, map[string]interface{}{"plan": plan["nombre"], "id": plan["_id"], "periodos": periodosSelecionados})
 			} else {
 				estadoHttp = "500"
-				outputError = map[string]interface{}{
-					"err":    outputError,
-					"status": estadoHttp,
-				}
+				outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 			}
 		}
 	} else {
 		estadoHttp = "500"
-		outputError = map[string]interface{}{
-			"err":    outputError,
-			"status": estadoHttp,
-		}
+		outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 	}
 	return result, outputError
 }
@@ -680,23 +662,22 @@ func GetPlanesParaEvaluar() (planes []string, outputError map[string]interface{}
 	return planes, outputError
 }
 
-func EvaluacionDetalle(vigencia string, plan string, periodoId string) (evaluacion []map[string]interface{}, outputError map[string]interface{}) {
+func EvaluacionDetalle(vigencia string, plan string, periodoId string) (evaluacion []map[string]interface{}, outputError error) {
 
 	defer func() {
 		if err := recover(); err != nil {
-			outputError = map[string]interface{}{"function": "EvaluacionDetalle", "err": err, "status": estadoHttp}
+			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 		}
 	}()
 
-	trimestres := GetPeriodos(vigencia)
+	trimestres, err := GetPeriodos(vigencia)
+	if err != nil {
+		return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
+	}
+
 	if len(trimestres) == 0 {
 		estadoHttp = "401"
-		outputError = map[string]interface{}{
-			"functions": "Error al obtener trimestres",
-			"err":       "False",
-			"status":    "401",
-		}
-
+		outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 	} else {
 		i := 0
 		for index, periodo := range trimestres {
@@ -811,19 +792,10 @@ func GetUnidadesPorPlanYVigencia(nombrePlan string, vigencia string) (unidades [
 	return unidades, outputError
 }
 
-func GetAvances(nombrePlan string, idVigencia string, idUnidad string) (respuesta map[string]interface{}, outputError map[string]interface{}) {
+func GetAvances(nombrePlan string, idVigencia string, idUnidad string) (respuesta map[string]interface{}, outputError error) {
 	defer func() {
 		if err := recover(); err != nil {
-			outputError = map[string]interface{}{
-				"funcion": "GetAvances",
-				"err":     err,
-				"status":  "404",
-			}
-			outputError = map[string]interface{}{
-				"funcion": "GetAvances",
-				"err":     err,
-				"status":  "404",
-			}
+			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 		}
 	}()
 	respuesta = make(map[string]interface{}, 0)
@@ -835,10 +807,7 @@ func GetAvances(nombrePlan string, idVigencia string, idUnidad string) (respuest
 	}
 
 	if planes, err := GetPlanesPeriodo(idUnidad, idVigencia); err != nil {
-		outputError = map[string]interface{}{
-			"funcion": "GetAvances",
-			"err":     err,
-			"status":  "404"}
+		outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 	} else {
 		planes = FiltrarArreglo(planes, func(plan map[string]interface{}) bool {
 			return plan["plan"] == nombrePlan
@@ -854,7 +823,10 @@ func GetAvances(nombrePlan string, idVigencia string, idUnidad string) (respuest
 			"id":     ultimoPeriodo["id"],
 			"nombre": ultimoPeriodo["nombre"],
 		}
-		trimestres := GetPeriodos(idVigencia)
+		trimestres, err := GetPeriodos(idVigencia)
+		if err != nil {
+			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
+		}
 		if len(trimestres) != 0 {
 			for index, trimestre := range trimestres {
 				for _, periodo := range periodos {
