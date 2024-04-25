@@ -18,17 +18,35 @@ func init() {
 
     beego.GlobalControllerRouter["github.com/udistrital/planeacion_evaluacion_mid/controllers:EvaluacionController"] = append(beego.GlobalControllerRouter["github.com/udistrital/planeacion_evaluacion_mid/controllers:EvaluacionController"],
         beego.ControllerComments{
-            Method: "GetPlanesPeriodo",
-            Router: "/planes_periodo/:vigencia/:unidad",
+            Method: "Avances",
+            Router: "/avance/:plan:/:vigencia/:unidad",
             AllowHTTPMethods: []string{"get"},
             MethodParams: param.Make(),
             Filters: nil,
             Params: nil})
 
-    beego.GlobalControllerRouter["github.com/udistrital/planeacion_evaluacion_mid/controllers:MainController"] = append(beego.GlobalControllerRouter["github.com/udistrital/planeacion_evaluacion_mid/controllers:MainController"],
+    beego.GlobalControllerRouter["github.com/udistrital/planeacion_evaluacion_mid/controllers:EvaluacionController"] = append(beego.GlobalControllerRouter["github.com/udistrital/planeacion_evaluacion_mid/controllers:EvaluacionController"],
         beego.ControllerComments{
-            Method: "Get",
-            Router: "/get/:id",
+            Method: "GetPlanesPeriodo",
+            Router: "/planes-periodo/:vigencia/:unidad",
+            AllowHTTPMethods: []string{"get"},
+            MethodParams: param.Make(),
+            Filters: nil,
+            Params: nil})
+
+    beego.GlobalControllerRouter["github.com/udistrital/planeacion_evaluacion_mid/controllers:EvaluacionController"] = append(beego.GlobalControllerRouter["github.com/udistrital/planeacion_evaluacion_mid/controllers:EvaluacionController"],
+        beego.ControllerComments{
+            Method: "PlanesAEvaluar",
+            Router: "/planes/",
+            AllowHTTPMethods: []string{"get"},
+            MethodParams: param.Make(),
+            Filters: nil,
+            Params: nil})
+
+    beego.GlobalControllerRouter["github.com/udistrital/planeacion_evaluacion_mid/controllers:EvaluacionController"] = append(beego.GlobalControllerRouter["github.com/udistrital/planeacion_evaluacion_mid/controllers:EvaluacionController"],
+        beego.ControllerComments{
+            Method: "Unidades",
+            Router: "/unidades/:plan:/:vigencia",
             AllowHTTPMethods: []string{"get"},
             MethodParams: param.Make(),
             Filters: nil,
