@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"github.com/astaxie/beego"
-	evaluacionhelper "github.com/udistrital/planeacion_evaluacion_mid/helpers"
 	"github.com/udistrital/planeacion_evaluacion_mid/services"
 	"github.com/udistrital/utils_oas/errorhandler"
 	"github.com/udistrital/utils_oas/requestresponse"
@@ -87,10 +86,14 @@ func (c *EvaluacionController) GetEvaluacion() {
 func (c *EvaluacionController) PlanesAEvaluar() {
 	defer errorhandler.HandlePanic(&c.Controller)
 
-	if datos, err := evaluacionhelper.GetPlanesParaEvaluar(); err == nil {
-		c.Data["json"] = map[string]interface{}{"Success": true, "Status": "200", "Message": "Successful", "Data": datos}
+	resultado, err := services.PlanesAEvaluar()
+
+	if err == nil {
+		c.Ctx.Output.SetStatus(200)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 200, resultado)
 	} else {
-		panic(map[string]interface{}{"funcion": "PlanesAEvaluar", "err": err, "status": "404", "message": "Error obteniendo los planes a evaluar"})
+		c.Ctx.Output.SetStatus(404)
+		c.Data["json"] = requestresponse.APIResponseDTO(true, 404, nil, err.Error())
 	}
 	c.ServeJSON()
 }
