@@ -11,7 +11,7 @@ info:
     url: http://www.apache.org/licenses/LICENSE-2.0.html
 basePath: /v1
 paths:
-  /evaluacion/{vigencia}/{plan}/{periodo}:
+  /{vigencia}/{plan}/{periodo}:
     get:
       tags:
       - evaluacion
@@ -38,7 +38,7 @@ paths:
           description: ""
         "404":
           description: ""
-  /evaluacion/planes-periodo/{vigencia}/{unidad}:
+  /planes-periodo/{vigencia}/{unidad}:
     get:
       tags:
       - evaluacion
