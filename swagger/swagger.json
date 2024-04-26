@@ -15,13 +15,53 @@
     },
     "basePath": "/v1",
     "paths": {
-        "/evaluacion/planes-periodo/{vigencia}/{unidad}": {
+        "/avance/{plan}/{vigencia}/{unidad}": {
             "get": {
                 "tags": [
-                    "evaluacion"
+                    "github.com/udistrital/planeacion_evaluacion_mid/controllersEvaluacionController"
+                ],
+                "description": "get Avance de Unidad",
+                "operationId": "EvaluacionController.GetAvance",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "plan",
+                        "description": "The key for staticblock",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "path",
+                        "name": "vigencia",
+                        "description": "The key for staticblock",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "path",
+                        "name": "unidad",
+                        "description": "The key for staticblock",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "404": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/planes-periodo/{vigencia}/{unidad}": {
+            "get": {
+                "tags": [
+                    "github.com/udistrital/planeacion_evaluacion_mid/controllersEvaluacionController"
                 ],
                 "description": "get Planes y vigencias para la unidad y vigencia dado",
-                "operationId": "EvaluacionController.PlanesPeriodo",
+                "operationId": "EvaluacionController.GetPlanesPeriodo",
                 "parameters": [
                     {
                         "in": "path",
@@ -48,13 +88,63 @@
                 }
             }
         },
-        "/evaluacion/{vigencia}/{plan}/{periodo}": {
+        "/planes/": {
             "get": {
                 "tags": [
-                    "evaluacion"
+                    "github.com/udistrital/planeacion_evaluacion_mid/controllersEvaluacionController"
+                ],
+                "description": "get Planes que se pueden evaluar",
+                "operationId": "EvaluacionController.GetPlanesAEvaluar",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "404": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/unidades/{plan}/{vigencia}": {
+            "get": {
+                "tags": [
+                    "github.com/udistrital/planeacion_evaluacion_mid/controllersEvaluacionController"
+                ],
+                "description": "get Unidades",
+                "operationId": "EvaluacionController.GetUnidades",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "plan",
+                        "description": "The key for staticblock",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "path",
+                        "name": "vigencia",
+                        "description": "The key for staticblock",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "404": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/{vigencia}/{plan}/{periodo}": {
+            "get": {
+                "tags": [
+                    "github.com/udistrital/planeacion_evaluacion_mid/controllersEvaluacionController"
                 ],
                 "description": "get Evaluacion",
-                "operationId": "EvaluacionController.Evaluacion",
+                "operationId": "EvaluacionController.GetEvaluacion",
                 "parameters": [
                     {
                         "in": "path",
@@ -91,7 +181,7 @@
     },
     "tags": [
         {
-            "name": "evaluacion",
+            "name": "github.com/udistrital/planeacion_evaluacion_mid/controllersEvaluacionController",
             "description": "EvaluacionController operations for Evaluacion\n"
         }
     ]
