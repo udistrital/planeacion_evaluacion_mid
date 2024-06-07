@@ -2,6 +2,9 @@ package helpers
 
 import (
 	"encoding/json"
+	"reflect"
+	"sort"
+	"strconv"
 
 	"github.com/astaxie/beego"
 	"github.com/udistrital/utils_oas/request"
@@ -42,6 +45,14 @@ func ConvertirStringJson(diccionario map[string]interface{}) map[string]interfac
 	return dicStrings
 }
 
+func LimpiezaRespuestaRefactor(respuesta map[string]interface{}, v interface{}) {
+	b, err := json.Marshal(respuesta["Data"])
+	if err != nil {
+		panic(err)
+	}
+	json.Unmarshal(b, &v)
+}
+
 func GetIdCodigoAbreviacion(ruta string, codigo string) (string, error) {
 	var resEstado map[string]interface{}
 	var estado []map[string]interface{}
@@ -54,6 +65,24 @@ func GetIdCodigoAbreviacion(ruta string, codigo string) (string, error) {
 	return estado[0]["_id"].(string), nil
 }
 
+func SortSlice(slice *[]map[string]interface{}, parameter string) {
+	sort.SliceStable(*slice, func(i, j int) bool {
+		var a int
+		var b int
+		if reflect.TypeOf((*slice)[j][parameter]).String() == "string" {
+			b, _ = strconv.Atoi((*slice)[j][parameter].(string))
+		} else {
+			b = int((*slice)[j][parameter].(float64))
+		}
+
+		if reflect.TypeOf((*slice)[i][parameter]).String() == "string" {
+			a, _ = strconv.Atoi((*slice)[i][parameter].(string))
+		} else {
+			a = int((*slice)[i][parameter].(float64))
+		}
+		return a < b
+	})
+}
 func FiltrarArreglo(data []map[string]interface{}, condicion func(map[string]interface{}) bool) []map[string]interface{} {
 	fltd := make([]map[string]interface{}, 0)
 	for _, v := range data {

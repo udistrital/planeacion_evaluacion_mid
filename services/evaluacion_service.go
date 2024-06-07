@@ -41,22 +41,21 @@ func GetPlanesPeriodo(vigencia string, unidad string) (respuesta []map[string]in
 	var resSeguimiento map[string]interface{}
 	respuesta = make([]map[string]interface{}, 0)
 
+	fmt.Println("================vigencia y unidad==============", vigencia, unidad)
+
 	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan?query=estado_plan_id:6153355601c7a2365b2fb2a1,dependencia_id:`+unidad+`,vigencia:`+vigencia, &resPlan); err == nil {
 		planes := make([]map[string]interface{}, 1)
 		request.LimpiezaRespuestaRefactor(resPlan, &planes)
 		// formatdata.JsonPrint(planes)
 		if fmt.Sprintf("%v", planes) == "[]" {
-			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
-			return nil, outputError
+			panic(map[string]interface{}{
+				"err":    "No se tienen planes en seguimiento para la dependencia y la vigencia",
+				"status": "404",
+			})
 		}
-		periodos, err := GetPeriodos(vigencia)
-		if err != nil {
-			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
-		}
-		trimestres, err := GetTrimestres(vigencia)
-		if err != nil {
-			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
-		}
+
+		periodos := GetPeriodos(vigencia, true)
+		trimestres := GetTrimestres(vigencia)
 
 		for _, plan := range planes {
 			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=tipo_seguimiento_id:61f236f525e40c582a0840d0,estado_seguimiento_id:622ba49216511e93a95c326d,plan_id:`+plan["_id"].(string), &resSeguimiento); err == nil {
@@ -65,6 +64,7 @@ func GetPlanesPeriodo(vigencia string, unidad string) (respuesta []map[string]in
 				if fmt.Sprintf("%v", seguimientos) == "[]" {
 					continue
 				}
+
 				var periodosSelecionados []map[string]interface{}
 				for _, seguimiento := range seguimientos {
 					for _, periodo := range periodos {
@@ -94,13 +94,17 @@ func GetPlanesPeriodo(vigencia string, unidad string) (respuesta []map[string]in
 				}
 				respuesta = append(respuesta, map[string]interface{}{"plan": plan["nombre"], "id": plan["_id"], "periodos": periodosSelecionados})
 			} else {
-				outputError = errors.New("error al decodificar el cuerpo de la solicitud")
-				return nil, outputError
+				panic(map[string]interface{}{
+					"err":    err,
+					"status": "404",
+				})
 			}
 		}
 	} else {
-		outputError = errors.New("error al decodificar el cuerpo de la solicitud")
-		return nil, outputError
+		panic(map[string]interface{}{
+			"err":    err,
+			"status": "404",
+		})
 	}
 	return respuesta, outputError
 }
@@ -119,12 +123,9 @@ func GetEvaluacion(vigencia string, plan string, periodoId string) (interface{},
 		return nil, errors.New("error al decodificar el cuerpo de la solicitud: 404")
 	}
 
-	trimestres, err := GetPeriodos(vigencia)
-	if err != nil {
-		return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
-	}
+	trimestres := GetPeriodos(vigencia, true)
 
-	if len(trimestres) == 0 {
+	if len(trimestres) < 4 {
 		return nil, nil
 	} else {
 		i := 0
@@ -134,7 +135,16 @@ func GetEvaluacion(vigencia string, plan string, periodoId string) (interface{},
 				break
 			}
 		}
-		evaluacion = GetEvaluacionInterno(plan, trimestres, i)
+
+		var periodo_id interface{}
+
+		for _, periodo := range trimestres {
+			if periodo["_id"] == periodoId {
+				periodo_id = periodo["periodo_id"]
+				break
+			}
+		}
+		evaluacion = GetEvaluacionInterno(plan, trimestres, i, vigencia, periodo_id)
 		return evaluacion, nil
 	}
 }
@@ -246,24 +256,28 @@ func GetUnidadesPorPlanYVigencia(nombrePlan string, vigencia string) (unidades [
 }
 
 func Avances(plan string, vigencia string, unidad string) (interface{}, error) {
-
 	if nombrePlan, err1 := url.QueryUnescape(plan); err1 == nil {
 		if data, err2 := GetAvances(nombrePlan, vigencia, unidad); err2 == nil {
 			return data, nil
 		} else {
-			return nil, errors.New("Error obteniendo los avances ")
+			return nil, errors.New("Error obteniendo los avances 1 ")
 		}
 	} else {
-		return nil, errors.New("Error obteniendo los avances " + err1.Error())
+		return nil, errors.New("Error obteniendo los avances 2" + err1.Error())
 	}
 }
 
-func GetAvances(nombrePlan string, idVigencia string, idUnidad string) (respuesta map[string]interface{}, outputError error) {
-	defer func() {
-		if err := recover(); err != nil {
-			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
-		}
-	}()
+func GetAvances(nombrePlan string, idVigencia string, idUnidad string) (respuesta map[string]interface{}, outputError map[string]interface{}) {
+	// defer func() {
+	// 	if err := recover(); err != nil {
+	// 		outputError = map[string]interface{}{
+	// 			"funcion": "GetAvances",
+	// 			"err":     err,
+	// 			"status":  "404",
+	// 		}
+	// 		panic(outputError)
+	// 	}
+	// }()
 	respuesta = make(map[string]interface{}, 0)
 	avance := map[int]float64{
 		1: 0,
@@ -272,8 +286,8 @@ func GetAvances(nombrePlan string, idVigencia string, idUnidad string) (respuest
 		4: 0,
 	}
 
-	if planes, err := GetPlanesPeriodoInterno(idUnidad, idVigencia); err != nil {
-		outputError = errors.New("error al decodificar el cuerpo de la solicitud")
+	if planes, err := GetPlanesPeriodo(idVigencia, idUnidad); err != nil {
+		panic(err)
 	} else {
 		planes = evaluacionhelper.FiltrarArreglo(planes, func(plan map[string]interface{}) bool {
 			return plan["plan"] == nombrePlan
@@ -289,15 +303,20 @@ func GetAvances(nombrePlan string, idVigencia string, idUnidad string) (respuest
 			"id":     ultimoPeriodo["id"],
 			"nombre": ultimoPeriodo["nombre"],
 		}
-		trimestres, err := GetPeriodos(idVigencia)
-		if err != nil {
-			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
-		}
+		fmt.Println("------------------ultimoPeriodo---------------------", ultimoPeriodo)
+
+		trimestres := GetPeriodos(idVigencia, true)
+		var periodo_id interface{}
+
+		// formatdata.JsonPrint(trimestres)
 		if len(trimestres) != 0 {
 			for index, trimestre := range trimestres {
 				for _, periodo := range periodos {
 					if trimestre["_id"] == periodo["id"] {
-						actividades := GetEvaluacionInterno(plan["id"].(string), trimestres, index)
+						if trimestre["_id"] == periodo["id"] {
+							periodo_id = trimestre["periodo_id"]
+						}
+						actividades := GetEvaluacionInterno(plan["id"].(string), trimestres, index, idVigencia, periodo_id)
 						var numeroActividad = "0"
 						for _, actividad := range actividades {
 							if numeroActividad != actividad["numero"] {
@@ -317,6 +336,7 @@ func GetAvances(nombrePlan string, idVigencia string, idUnidad string) (respuest
 								}
 							}
 						}
+
 					}
 				}
 			}
@@ -345,17 +365,12 @@ func GetPlanesPeriodoInterno(unidad string, vigencia string) (respuesta []map[st
 		// formatdata.JsonPrint(planes)
 		if fmt.Sprintf("%v", planes) == "[]" {
 			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
-
 		}
 
-		periodos, err := GetPeriodos(vigencia)
-		if err != nil {
-			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
-		}
-		trimestres, err := GetTrimestres(vigencia)
-		if err != nil {
-			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
-		}
+		periodos := GetPeriodos(vigencia, true)
+
+		trimestres := GetTrimestres(vigencia)
+
 		for _, plan := range planes {
 			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=tipo_seguimiento_id:61f236f525e40c582a0840d0,estado_seguimiento_id:622ba49216511e93a95c326d,plan_id:`+plan["_id"].(string), &resSeguimiento); err == nil {
 				seguimientos := make([]map[string]interface{}, 1)
@@ -412,7 +427,6 @@ func PlanesAEvaluar() (planes []string, outputError error) {
 	var respuestaEstado map[string]interface{}
 	var respuestaTipoSeguimiento map[string]interface{}
 	var respuestaSeguimiento map[string]interface{}
-
 	var estadoSeguimiento []map[string]interface{}
 	var tipoSeguimiento []map[string]interface{}
 
@@ -426,7 +440,7 @@ func PlanesAEvaluar() (planes []string, outputError error) {
 	}
 	request.LimpiezaRespuestaRefactor(respuestaTipoSeguimiento, &tipoSeguimiento)
 
-	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=tipo_seguimiento_id:`+tipoSeguimiento[0]["_id"].(string)+`,estado_seguimiento_id:`+estadoSeguimiento[0]["_id"].(string), &respuestaSeguimiento); err == nil {
+	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=tipo_seguimiento_id:`+tipoSeguimiento[0]["_id"].(string)+`,estado_seguimiento_id:`+estadoSeguimiento[0]["_id"].(string)+`,activo:true`, &respuestaSeguimiento); err == nil {
 		var seguimientos []map[string]interface{}
 		request.LimpiezaRespuestaRefactor(respuestaSeguimiento, &seguimientos)
 		for _, seguimiento := range seguimientos {
@@ -450,12 +464,12 @@ func PlanesAEvaluar() (planes []string, outputError error) {
 		}
 	} else {
 		outputError = errors.New("error al decodificar el cuerpo de la solicitud: 404")
-
 	}
+
 	return planes, outputError
 }
 
-func GetEvaluacionInterno(planId string, periodos []map[string]interface{}, trimestre int) []map[string]interface{} {
+func GetEvaluacionInterno(planId string, periodos []map[string]interface{}, trimestre int, vigencia string, periodo_id interface{}) []map[string]interface{} {
 	var resSeguimiento map[string]interface{}
 	var seguimiento map[string]interface{}
 	var evaluacion []map[string]interface{}
@@ -463,22 +477,15 @@ func GetEvaluacionInterno(planId string, periodos []map[string]interface{}, trim
 	detalle := make(map[string]interface{})
 	actividades := make(map[string]interface{})
 
-	idEstadoSeguimiento, err := evaluacionhelper.GetIdCodigoAbreviacion("estado-seguimiento", CodigoEstadoSeguimiento)
-	if err != nil {
-		return nil
-	}
-
-	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=estado_seguimiento_id:`+idEstadoSeguimiento+`,plan_id:`+planId+`,periodo_seguimiento_id:`+periodos[trimestre]["_id"].(string), &resSeguimiento); err == nil {
+	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=estado_seguimiento_id:622ba49216511e93a95c326d,plan_id:`+planId+`,periodo_seguimiento_id:`+periodos[trimestre]["_id"].(string), &resSeguimiento); err == nil {
 		aux := make([]map[string]interface{}, 1)
 		request.LimpiezaRespuestaRefactor(resSeguimiento, &aux)
 		if fmt.Sprintf("%v", aux) == "[]" {
 			return nil
 		}
-
 		seguimiento = aux[0]
 		datoStr := seguimiento["dato"].(string)
 		json.Unmarshal([]byte(datoStr), &actividades)
-
 		for actividadId, act := range actividades {
 			id, segregado := actividades[actividadId].(map[string]interface{})["id"].(string)
 			var actividad map[string]interface{}
@@ -491,29 +498,31 @@ func GetEvaluacionInterno(planId string, periodos []map[string]interface{}, trim
 			} else {
 				actividad = act.(map[string]interface{})
 			}
+
 			for indexPeriodo, periodo := range periodos {
 				if indexPeriodo > trimestre {
 					break
 				}
 				resIndicadores := GetEvaluacionTrimestre(planId, periodo["_id"].(string), actividadId)
-				for _, resIndicador := range resIndicadores {
 
+				for _, resIndicador := range resIndicadores {
 					indice := -1
 					for index, eval := range evaluacion {
 						if eval["numero"] == actividad["informacion"].(map[string]interface{})["index"] && eval["indicador"] == resIndicador["indicador"] {
 							indice = index
 							break
 						}
+
 					}
 
 					var trimestreNom string
-					if indexPeriodo == 0 {
+					if periodo_id == "344" {
 						trimestreNom = "trimestre1"
-					} else if indexPeriodo == 1 {
+					} else if periodo_id == "345" {
 						trimestreNom = "trimestre2"
-					} else if indexPeriodo == 2 {
+					} else if periodo_id == "346" {
 						trimestreNom = "trimestre3"
-					} else if indexPeriodo == 3 {
+					} else if periodo_id == "347" {
 						trimestreNom = "trimestre4"
 					}
 
@@ -560,7 +569,7 @@ func GetEvaluacionInterno(planId string, periodos []map[string]interface{}, trim
 			}
 		}
 
-		request.SortSlice(&evaluacion, "numero")
+		evaluacionhelper.SortSlice(&evaluacion, "numero")
 		agrupacion_actividades := make(map[string][]int)
 		for i, eval := range evaluacion {
 			if _, ok := agrupacion_actividades[eval["numero"].(string)]; !ok {
@@ -576,32 +585,32 @@ func GetEvaluacionInterno(planId string, periodos []map[string]interface{}, trim
 			sum4 := 0.0
 
 			for _, i := range idxs {
-				for _, trimestre := range []string{"trimestre1", "trimestre2", "trimestre3", "trimestre4"} {
-					if val, ok := evaluacion[i][trimestre]; ok && fmt.Sprintf("%v", val) != "map[]" {
-						meta := evaluacion[i][trimestre].(map[string]interface{})["meta"].(float64)
-						if meta > 1 {
-							switch trimestre {
-							case "trimestre1":
-								sum1 += 1.0
-							case "trimestre2":
-								sum2 += 1.0
-							case "trimestre3":
-								sum3 += 1.0
-							case "trimestre4":
-								sum4 += 1.0
-							}
-						} else {
-							switch trimestre {
-							case "trimestre1":
-								sum1 += meta
-							case "trimestre2":
-								sum2 += meta
-							case "trimestre3":
-								sum3 += meta
-							case "trimestre4":
-								sum4 += meta
-							}
-						}
+				if fmt.Sprintf("%v", evaluacion[i]["trimestre1"]) != "map[]" {
+					if evaluacion[i]["trimestre1"].(map[string]interface{})["meta"].(float64) > 1 {
+						sum1 = sum1 + 1.0
+					} else {
+						sum1 = sum1 + evaluacion[i]["trimestre1"].(map[string]interface{})["meta"].(float64)
+					}
+				}
+				if fmt.Sprintf("%v", evaluacion[i]["trimestre2"]) != "map[]" {
+					if evaluacion[i]["trimestre2"].(map[string]interface{})["meta"].(float64) > 1 {
+						sum2 = sum2 + 1.0
+					} else {
+						sum2 = sum2 + evaluacion[i]["trimestre2"].(map[string]interface{})["meta"].(float64)
+					}
+				}
+				if fmt.Sprintf("%v", evaluacion[i]["trimestre3"]) != "map[]" {
+					if evaluacion[i]["trimestre3"].(map[string]interface{})["meta"].(float64) > 1 {
+						sum3 = sum3 + 1.0
+					} else {
+						sum3 = sum3 + evaluacion[i]["trimestre3"].(map[string]interface{})["meta"].(float64)
+					}
+				}
+				if fmt.Sprintf("%v", evaluacion[i]["trimestre4"]) != "map[]" {
+					if evaluacion[i]["trimestre4"].(map[string]interface{})["meta"].(float64) > 1 {
+						sum4 = sum4 + 1.0
+					} else {
+						sum4 = sum4 + evaluacion[i]["trimestre4"].(map[string]interface{})["meta"].(float64)
 					}
 				}
 			}
@@ -629,19 +638,19 @@ func GetEvaluacionInterno(planId string, periodos []map[string]interface{}, trim
 			}
 
 			for _, i := range idxs {
-				updateActividad := func(trimestre string, cumplActividad interface{}) {
-					key := fmt.Sprintf("%v", evaluacion[i][trimestre])
-					if key != "map[]" {
-						evaluacion[i][trimestre].(map[string]interface{})["actividad"] = cumplActividad
-					}
+				if fmt.Sprintf("%v", evaluacion[i]["trimestre1"]) != "map[]" {
+					evaluacion[i]["trimestre1"].(map[string]interface{})["actividad"] = cumplActividad1
 				}
-
-				updateActividad("trimestre1", cumplActividad1)
-				updateActividad("trimestre2", cumplActividad2)
-				updateActividad("trimestre3", cumplActividad3)
-				updateActividad("trimestre4", cumplActividad4)
+				if fmt.Sprintf("%v", evaluacion[i]["trimestre2"]) != "map[]" {
+					evaluacion[i]["trimestre2"].(map[string]interface{})["actividad"] = cumplActividad2
+				}
+				if fmt.Sprintf("%v", evaluacion[i]["trimestre3"]) != "map[]" {
+					evaluacion[i]["trimestre3"].(map[string]interface{})["actividad"] = cumplActividad3
+				}
+				if fmt.Sprintf("%v", evaluacion[i]["trimestre4"]) != "map[]" {
+					evaluacion[i]["trimestre4"].(map[string]interface{})["actividad"] = cumplActividad4
+				}
 			}
-
 		}
 
 		return evaluacion
@@ -739,10 +748,7 @@ func EvaluacionDetalle(vigencia string, plan string, periodoId string) (evaluaci
 		}
 	}()
 
-	trimestres, err := GetPeriodos(vigencia)
-	if err != nil {
-		return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
-	}
+	trimestres := GetPeriodos(vigencia, true)
 
 	if len(trimestres) == 0 {
 		outputError = errors.New("error al decodificar el cuerpo de la solicitud")
@@ -755,60 +761,57 @@ func EvaluacionDetalle(vigencia string, plan string, periodoId string) (evaluaci
 			}
 		}
 
-		evaluacion = GetEvaluacionInterno(plan, trimestres, i)
+		evaluacion = GetEvaluacionInterno(plan, trimestres, i, vigencia, periodoId)
 
 	}
 	return evaluacion, outputError
 }
-func GetTrimestres(vigencia string) ([]map[string]interface{}, error) {
+func GetTrimestres(vigencia string) []map[string]interface{} {
 
 	var res map[string]interface{}
 	var trimestre []map[string]interface{}
 	var trimestres []map[string]interface{}
 
 	if err := request.GetJson("http://"+beego.AppConfig.String("ParametrosService")+"/parametro_periodo?query=PeriodoId:"+vigencia+",ParametroId__CodigoAbreviacion:T1", &res); err == nil {
-		request.LimpiezaRespuestaRefactor(res, &trimestre)
+		evaluacionhelper.LimpiezaRespuestaRefactor(res, &trimestre)
 		trimestres = append(trimestres, trimestre...)
 
 		trimestre = nil
 		if err := request.GetJson("http://"+beego.AppConfig.String("ParametrosService")+"/parametro_periodo?query=PeriodoId:"+vigencia+",ParametroId__CodigoAbreviacion:T2", &res); err == nil {
-			request.LimpiezaRespuestaRefactor(res, &trimestre)
+			evaluacionhelper.LimpiezaRespuestaRefactor(res, &trimestre)
 			trimestres = append(trimestres, trimestre...)
 
 			trimestre = nil
 			if err := request.GetJson("http://"+beego.AppConfig.String("ParametrosService")+"/parametro_periodo?query=PeriodoId:"+vigencia+",ParametroId__CodigoAbreviacion:T3", &res); err == nil {
-				request.LimpiezaRespuestaRefactor(res, &trimestre)
+				evaluacionhelper.LimpiezaRespuestaRefactor(res, &trimestre)
 				trimestres = append(trimestres, trimestre...)
 
 				trimestre = nil
 				if err := request.GetJson("http://"+beego.AppConfig.String("ParametrosService")+"/parametro_periodo?query=PeriodoId:"+vigencia+",ParametroId__CodigoAbreviacion:T4", &res); err == nil {
-					request.LimpiezaRespuestaRefactor(res, &trimestre)
+					evaluacionhelper.LimpiezaRespuestaRefactor(res, &trimestre)
 					trimestres = append(trimestres, trimestre...)
 				} else {
-					return nil, errors.New("error GetTrimestres en la solicitud: " + err.Error())
+					panic(map[string]interface{}{"funcion": "GetTrimestres", "err": "Error ", "status": "400", "log": err})
 				}
 			} else {
-				return nil, errors.New("error GetTrimestres en la solicitud: " + err.Error())
+				panic(map[string]interface{}{"funcion": "GetTrimestres", "err": "Error ", "status": "400", "log": err})
 			}
 		} else {
-			return nil, errors.New("error GetTrimestres en la solicitud: " + err.Error())
+			panic(map[string]interface{}{"funcion": "GetTrimestres", "err": "Error ", "status": "400", "log": err})
 		}
 	} else {
-		return nil, errors.New("error GetTrimestres en la solicitud: " + err.Error())
+		panic(map[string]interface{}{"funcion": "GetTrimestres", "err": "Error ", "status": "400", "log": err})
 	}
-	return trimestres, nil
+
+	return trimestres
 }
-func GetPeriodos(vigencia string) ([]map[string]interface{}, error) {
+
+func GetPeriodos(vigencia string, modo bool) []map[string]interface{} {
 	var periodos []map[string]interface{}
 	var resPeriodo map[string]interface{}
 	var wg sync.WaitGroup
-	trimestres, err := GetTrimestres(vigencia)
-	if err != nil {
-		return nil, errors.New("error GetTrimestres en la solicitud: " + err.Error())
-	}
-
+	trimestres := GetTrimestres(vigencia)
 	periodosMutex := sync.Mutex{}
-
 	for _, trimestre := range trimestres {
 		wg.Add(1)
 		if fmt.Sprintf("%v", trimestre) == "map[]" {
@@ -820,9 +823,12 @@ func GetPeriodos(vigencia string) ([]map[string]interface{}, error) {
 			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/periodo-seguimiento?fields=_id,periodo_id&query=tipo_seguimiento_id:61f236f525e40c582a0840d0,periodo_id:`+strconv.Itoa(trimestreId), &resPeriodo); err == nil {
 				var periodo []map[string]interface{}
 				request.LimpiezaRespuestaRefactor(resPeriodo, &periodo)
-				(*periodos) = append((*periodos), periodo...)
-			} else {
-				err = errors.New("error al decodificar el cuerpo de la solicitud")
+				if modo {
+					(*periodos) = append((*periodos), periodo...)
+				} else {
+					(*periodos) = append((*periodos), periodo[len(periodo)-1])
+				}
+
 			}
 			periodosMutex.Unlock()
 			wg.Done()
@@ -831,8 +837,8 @@ func GetPeriodos(vigencia string) ([]map[string]interface{}, error) {
 
 	wg.Wait()
 
-	request.SortSlice(&periodos, "periodo_id")
-	return periodos, nil
+	evaluacionhelper.SortSlice(&periodos, "periodo_id")
+	return periodos
 }
 
 func PlanDetalle(vigencia string, unidad string) (result []map[string]interface{}, outputError error) {
@@ -857,14 +863,9 @@ func PlanDetalle(vigencia string, unidad string) (result []map[string]interface{
 			outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 		}
 
-		periodos, err := GetPeriodos(vigencia)
-		if err != nil {
-			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
-		}
-		trimestres, err := GetTrimestres(vigencia)
-		if err != nil {
-			return nil, errors.New("error GetPeriodos en la solicitud: " + err.Error())
-		}
+		periodos := GetPeriodos(vigencia, true)
+
+		trimestres := GetTrimestres(vigencia)
 
 		idEstadoSeguimiento, err1 := evaluacionhelper.GetIdCodigoAbreviacion("estado-seguimiento", CodigoEstadoSeguimiento)
 		idTipoSeguimiento, err2 := evaluacionhelper.GetIdCodigoAbreviacion("tipo-seguimiento", CodigoTipoSeguimiento)

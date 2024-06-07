@@ -78,16 +78,14 @@ func (c *EvaluacionController) GetEvaluacion() {
 }
 
 // Get Planes A Evaluar ...
-// @Title GetPlanesAEvaluar
+// @Title PlanesAEvaluar
 // @Description get Planes que se pueden evaluar
 // @Success 200
 // @Failure 404
 // @router /planes/ [get]
 func (c *EvaluacionController) PlanesAEvaluar() {
 	defer errorhandler.HandlePanic(&c.Controller)
-
 	resultado, err := services.PlanesAEvaluar()
-
 	if err == nil {
 		c.Ctx.Output.SetStatus(200)
 		c.Data["json"] = requestresponse.APIResponseDTO(true, 200, resultado)
@@ -124,8 +122,9 @@ func (c *EvaluacionController) Unidades() {
 	c.ServeJSON()
 }
 
-// Get Avance ...
-// @Title GetAvance
+//	Avance ...
+//
+// @Title Avances
 // @Description get Avance de Unidad
 // @Param	plan 		path 	string	true		"The key for staticblock"
 // @Param	vigencia 	path 	string	true		"The key for staticblock"
