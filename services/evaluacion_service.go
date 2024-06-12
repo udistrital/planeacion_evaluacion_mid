@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/astaxie/beego"
-	"github.com/udistrital/planeacion_evaluacion_mid/helpers"
 	evaluacionhelper "github.com/udistrital/planeacion_evaluacion_mid/helpers"
 	"github.com/udistrital/utils_oas/request"
 )
@@ -510,7 +509,7 @@ func GetEvaluacionInterno(planId string, periodos []map[string]interface{}, trim
 			}
 
 			if err := request.GetJson("http://"+beego.AppConfig.String("ParametrosService")+"/parametro_periodo?query=PeriodoId:"+vigencia+",Id:"+periodo_id.(string)+"", &trimestrenombre); err == nil {
-				helpers.LimpiezaRespuestaRefactor(trimestrenombre, &trimestrenombreL)
+				request.LimpiezaRespuestaRefactor(trimestrenombre, &trimestrenombreL)
 			} else {
 				err = errors.New("error al decodificar el cuerpo de la solicitud: 404" + err.Error())
 			}
@@ -868,7 +867,7 @@ func GetPeriodos(vigencia string, modo bool) []map[string]interface{} {
 
 	wg.Wait()
 
-	helpers.SortSlice(&periodos, "periodo_id")
+	request.SortSlice(&periodos, "periodo_id")
 	return periodos
 }
 
