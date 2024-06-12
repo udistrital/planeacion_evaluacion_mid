@@ -598,7 +598,7 @@ func GetEvaluacionInterno(planId string, periodos []map[string]interface{}, trim
 			}
 		}
 
-		evaluacionhelper.SortSlice(&evaluacion, "numero")
+		request.SortSlice(&evaluacion, "numero")
 		agrupacion_actividades := make(map[string][]int)
 		for i, eval := range evaluacion {
 			if _, ok := agrupacion_actividades[eval["numero"].(string)]; !ok {
@@ -802,22 +802,22 @@ func GetTrimestres(vigencia string) []map[string]interface{} {
 	var trimestres []map[string]interface{}
 
 	if err := request.GetJson("http://"+beego.AppConfig.String("ParametrosService")+"/parametro_periodo?query=PeriodoId:"+vigencia+",ParametroId__CodigoAbreviacion:T1", &res); err == nil {
-		evaluacionhelper.LimpiezaRespuestaRefactor(res, &trimestre)
+		request.LimpiezaRespuestaRefactor(res, &trimestre)
 		trimestres = append(trimestres, trimestre...)
 
 		trimestre = nil
 		if err := request.GetJson("http://"+beego.AppConfig.String("ParametrosService")+"/parametro_periodo?query=PeriodoId:"+vigencia+",ParametroId__CodigoAbreviacion:T2", &res); err == nil {
-			evaluacionhelper.LimpiezaRespuestaRefactor(res, &trimestre)
+			request.LimpiezaRespuestaRefactor(res, &trimestre)
 			trimestres = append(trimestres, trimestre...)
 
 			trimestre = nil
 			if err := request.GetJson("http://"+beego.AppConfig.String("ParametrosService")+"/parametro_periodo?query=PeriodoId:"+vigencia+",ParametroId__CodigoAbreviacion:T3", &res); err == nil {
-				evaluacionhelper.LimpiezaRespuestaRefactor(res, &trimestre)
+				request.LimpiezaRespuestaRefactor(res, &trimestre)
 				trimestres = append(trimestres, trimestre...)
 
 				trimestre = nil
 				if err := request.GetJson("http://"+beego.AppConfig.String("ParametrosService")+"/parametro_periodo?query=PeriodoId:"+vigencia+",ParametroId__CodigoAbreviacion:T4", &res); err == nil {
-					evaluacionhelper.LimpiezaRespuestaRefactor(res, &trimestre)
+					request.LimpiezaRespuestaRefactor(res, &trimestre)
 					trimestres = append(trimestres, trimestre...)
 				} else {
 					err = errors.New("error al decodificar el cuerpo de la solicitud: GetTrimestres:400 " + err.Error())
@@ -853,7 +853,7 @@ func GetPeriodos(vigencia string, modo bool) []map[string]interface{} {
 			periodosMutex.Lock()
 			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/periodo-seguimiento?fields=_id,periodo_id&query=tipo_seguimiento_id:61f236f525e40c582a0840d0,periodo_id:`+strconv.Itoa(trimestreId), &resPeriodo); err == nil {
 				var periodo []map[string]interface{}
-				evaluacionhelper.LimpiezaRespuestaRefactor(resPeriodo, &periodo)
+				request.LimpiezaRespuestaRefactor(resPeriodo, &periodo)
 				if modo {
 					(*periodos) = append((*periodos), periodo...)
 				} else {
