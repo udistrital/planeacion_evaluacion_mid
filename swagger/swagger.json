@@ -20,8 +20,8 @@
                 "tags": [
                     "github.com/udistrital/planeacion_evaluacion_mid/controllersEvaluacionController"
                 ],
-                "description": "get Avance de Unidad",
-                "operationId": "EvaluacionController.GetAvance",
+                "description": "Avance de Unidad",
+                "operationId": "EvaluacionController.Avances",
                 "parameters": [
                     {
                         "in": "path",
@@ -94,7 +94,7 @@
                     "github.com/udistrital/planeacion_evaluacion_mid/controllersEvaluacionController"
                 ],
                 "description": "get Planes que se pueden evaluar",
-                "operationId": "EvaluacionController.GetPlanesAEvaluar",
+                "operationId": "EvaluacionController.PlanesAEvaluar",
                 "responses": {
                     "200": {
                         "description": ""
