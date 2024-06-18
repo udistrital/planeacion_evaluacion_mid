@@ -13,6 +13,7 @@ import (
 	"github.com/astaxie/beego"
 	evaluacionhelper "github.com/udistrital/planeacion_evaluacion_mid/helpers"
 	"github.com/udistrital/utils_oas/request"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -184,6 +185,9 @@ func GetUnidadesPorPlanYVigencia(nombrePlan string, vigencia string) (unidades [
 	var tipoSeguimiento []map[string]interface{}
 	idsUnidades := make([]string, 0)
 	unidades = make([]map[string]interface{}, 0)
+	var mutex sync.Mutex
+	wge := new(errgroup.Group)
+	wge2 := new(errgroup.Group)
 
 	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+"/estado-seguimiento?query=activo:true,codigo_abreviacion:"+ABREVIACION_AVALADO_PARA_SEGUIMIENTO, &respuestaEstado); err != nil {
 		outputError = map[string]interface{}{
@@ -205,47 +209,65 @@ func GetUnidadesPorPlanYVigencia(nombrePlan string, vigencia string) (unidades [
 		var seguimientos []map[string]interface{}
 		request.LimpiezaRespuestaRefactor(respuestaSeguimiento, &seguimientos)
 		for _, seguimiento := range seguimientos {
-			// Esta en los planes que ya se trajeron?
-			var respuestaPlan map[string]interface{}
-			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan/`+seguimiento["plan_id"].(string), &respuestaPlan); err == nil {
-				var plan map[string]interface{}
-				request.LimpiezaRespuestaRefactor(respuestaPlan, &plan)
+			seguimiento := seguimiento
+			wge.Go(func() error {
+				// Esta en los planes que ya se trajeron?
+				var respuestaPlan map[string]interface{}
+				if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan/`+seguimiento["plan_id"].(string), &respuestaPlan); err == nil {
+					var plan map[string]interface{}
+					request.LimpiezaRespuestaRefactor(respuestaPlan, &plan)
 
-				if plan["nombre"] == nombrePlan && vigencia == plan["vigencia"] {
-					existeIdUnidad := false
-					for _, idUnidad := range idsUnidades {
-						if idUnidad == plan["dependencia_id"].(string) {
-							existeIdUnidad = true
+					if plan["nombre"] == nombrePlan && vigencia == plan["vigencia"] {
+						existeIdUnidad := false
+						for _, idUnidad := range idsUnidades {
+							if idUnidad == plan["dependencia_id"].(string) {
+								existeIdUnidad = true
+							}
+						}
+						if !existeIdUnidad {
+							mutex.Lock()
+							idsUnidades = append(idsUnidades, plan["dependencia_id"].(string))
+							mutex.Unlock()
 						}
 					}
-					if !existeIdUnidad {
-						idsUnidades = append(idsUnidades, plan["dependencia_id"].(string))
-					}
-				}
 
-			} else {
-				outputError = map[string]interface{}{
-					"err":    err,
-					"status": "404",
-				}
-			}
-		}
-		if len(idsUnidades) > 0 {
-			valor := 0
-			for _, idUnidad := range idsUnidades {
-				valor++
-				if err := request.GetJson("http://"+beego.AppConfig.String("OikosService")+"/dependencia_tipo_dependencia?query=DependenciaId__Id:"+idUnidad, &respuestaTipoDependencia); err == nil {
-					aux := respuestaTipoDependencia[0]["DependenciaId"].(map[string]interface{})
-					delete(aux, "DependenciaTipoDependencia")
-					aux["TipoDependencia"] = respuestaTipoDependencia[0]["TipoDependenciaId"]
-					unidades = append(unidades, aux)
-					respuestaTipoDependencia = nil
 				} else {
 					outputError = map[string]interface{}{
 						"err":    err,
 						"status": "404",
 					}
 				}
+				return nil
+			})
+		}
+		if err := wge.Wait(); err != nil {
+			return nil, outputError
+		}
+		if len(idsUnidades) > 0 {
+			valor := 0
+			for _, idUnidad := range idsUnidades {
+				idUnidad := idUnidad
+				wge2.Go(func() error {
+					valor++
+					if err := request.GetJson("http://"+beego.AppConfig.String("OikosService")+"/dependencia_tipo_dependencia?query=DependenciaId__Id:"+idUnidad, &respuestaTipoDependencia); err == nil {
+						aux := respuestaTipoDependencia[0]["DependenciaId"].(map[string]interface{})
+						delete(aux, "DependenciaTipoDependencia")
+						aux["TipoDependencia"] = respuestaTipoDependencia[0]["TipoDependenciaId"]
+						mutex.Lock()
+						unidades = append(unidades, aux)
+						mutex.Unlock()
+						respuestaTipoDependencia = nil
+					} else {
+						outputError = map[string]interface{}{
+							"err":    err,
+							"status": "404",
+						}
+					}
+					return nil
+				})
+			}
+			if err := wge2.Wait(); err != nil {
+				return nil, outputError
 			}
 		}
 	} else {
@@ -435,6 +457,8 @@ func PlanesAEvaluar() (planes []string, outputError error) {
 	var respuestaSeguimiento map[string]interface{}
 	var estadoSeguimiento []map[string]interface{}
 	var tipoSeguimiento []map[string]interface{}
+	var mutex sync.Mutex
+	wge := new(errgroup.Group)
 
 	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+"/estado-seguimiento?query=activo:true,codigo_abreviacion:"+ABREVIACION_AVALADO_PARA_SEGUIMIENTO, &respuestaEstado); err != nil {
 		outputError = errors.New("error al decodificar el cuerpo de la solicitud: 404")
@@ -450,23 +474,32 @@ func PlanesAEvaluar() (planes []string, outputError error) {
 		var seguimientos []map[string]interface{}
 		request.LimpiezaRespuestaRefactor(respuestaSeguimiento, &seguimientos)
 		for _, seguimiento := range seguimientos {
-			// Esta en los planes que ya se trajeron?
-			var respuestaPlan map[string]interface{}
-			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan/`+seguimiento["plan_id"].(string), &respuestaPlan); err == nil {
-				var plan map[string]interface{}
-				existeNombrePlan := false
-				request.LimpiezaRespuestaRefactor(respuestaPlan, &plan)
-				for _, nombre := range planes {
-					if nombre == plan["nombre"].(string) {
-						existeNombrePlan = true
+			seguimiento := seguimiento
+			wge.Go(func() error {
+				// Esta en los planes que ya se trajeron?
+				var respuestaPlan map[string]interface{}
+				if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan/`+seguimiento["plan_id"].(string), &respuestaPlan); err == nil {
+					var plan map[string]interface{}
+					existeNombrePlan := false
+					request.LimpiezaRespuestaRefactor(respuestaPlan, &plan)
+					for _, nombre := range planes {
+						if nombre == plan["nombre"].(string) {
+							existeNombrePlan = true
+						}
 					}
+					if !existeNombrePlan {
+						mutex.Lock()
+						planes = append(planes, plan["nombre"].(string))
+						mutex.Unlock()
+					}
+				} else {
+					outputError = errors.New("error al decodificar el cuerpo de la solicitud: 404")
 				}
-				if !existeNombrePlan {
-					planes = append(planes, plan["nombre"].(string))
-				}
-			} else {
-				outputError = errors.New("error al decodificar el cuerpo de la solicitud: 404")
-			}
+				return nil
+			})
+		}
+		if err := wge.Wait(); err != nil {
+			return nil, errors.New(err.Error())
 		}
 	} else {
 		outputError = errors.New("error al decodificar el cuerpo de la solicitud: 404")
@@ -948,71 +981,4 @@ func PlanDetalle(vigencia string, unidad string) (result []map[string]interface{
 		outputError = errors.New("error al decodificar el cuerpo de la solicitud")
 	}
 	return result, outputError
-}
-
-func GetPlanesParaEvaluar() (planes []string, outputError map[string]interface{}) {
-	defer func() {
-		if err := recover(); err != nil {
-			outputError = map[string]interface{}{
-				"funcion": "GetPlanesParaEvaluar",
-				"err":     err,
-				"status":  "400",
-			}
-			outputError = map[string]interface{}{
-				"err": outputError,
-			}
-		}
-	}()
-
-	var respuestaEstado map[string]interface{}
-	var respuestaTipoSeguimiento map[string]interface{}
-	var respuestaSeguimiento map[string]interface{}
-
-	var estadoSeguimiento []map[string]interface{}
-	var tipoSeguimiento []map[string]interface{}
-
-	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+"/estado-seguimiento?query=activo:true,codigo_abreviacion:"+ABREVIACION_AVALADO_PARA_SEGUIMIENTO, &respuestaEstado); err != nil {
-		outputError = map[string]interface{}{
-			"err": outputError,
-		}
-	}
-	request.LimpiezaRespuestaRefactor(respuestaEstado, &estadoSeguimiento)
-
-	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+"/tipo-seguimiento?query=activo:true,codigo_abreviacion:"+ABREVIACION_SEGUIMIENTO_PLAN_ACCION, &respuestaTipoSeguimiento); err != nil {
-		outputError = map[string]interface{}{
-			"err": outputError,
-		}
-	}
-	request.LimpiezaRespuestaRefactor(respuestaTipoSeguimiento, &tipoSeguimiento)
-
-	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=tipo_seguimiento_id:`+tipoSeguimiento[0]["_id"].(string)+`,estado_seguimiento_id:`+estadoSeguimiento[0]["_id"].(string), &respuestaSeguimiento); err == nil {
-		var seguimientos []map[string]interface{}
-		request.LimpiezaRespuestaRefactor(respuestaSeguimiento, &seguimientos)
-		for _, seguimiento := range seguimientos {
-			// Esta en los planes que ya se trajeron?
-			var respuestaPlan map[string]interface{}
-			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan/`+seguimiento["plan_id"].(string), &respuestaPlan); err == nil {
-				var plan map[string]interface{}
-				existeNombrePlan := false
-				request.LimpiezaRespuestaRefactor(respuestaPlan, &plan)
-				for _, nombre := range planes {
-					if nombre == plan["nombre"].(string) {
-						existeNombrePlan = true
-					}
-				}
-				if !existeNombrePlan {
-					planes = append(planes, plan["nombre"].(string))
-				}
-			} else {
-				outputError = map[string]interface{}{
-					"err": outputError,
-				}
-			}
-		}
-	} else {
-		outputError = map[string]interface{}{
-			"err": outputError,
-		}
-	}
-	return planes, outputError
 }
