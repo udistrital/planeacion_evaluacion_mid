@@ -42,7 +42,7 @@ paths:
     get:
       tags:
       - github.com/udistrital/planeacion_evaluacion_mid/controllersEvaluacionController
-      description:  Avance de Unidad
+      description: get Avance de Unidad
       operationId: EvaluacionController.Avances
       parameters:
       - in: path
