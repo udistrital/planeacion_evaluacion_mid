@@ -950,7 +950,9 @@ func PlanDetalle(vigencia string, unidad string) (result []map[string]interface{
 func GetPeriodosPlan(vigenciaId string, plan_id string) []map[string]interface{} {
 	var periodos []map[string]interface{}
 	var respuestaPeriodoSeguimiento map[string]interface{}
+	var respuestaUnidad []map[string]interface{}
 	var plan_completo map[string]interface{}
+	var plan_formato map[string]interface{}
 	var respuestaPlan map[string]interface{}
 	var wg sync.WaitGroup
 
@@ -959,6 +961,28 @@ func GetPeriodosPlan(vigenciaId string, plan_id string) []map[string]interface{}
 	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan/`+plan_id, &respuestaPlan); err == nil {
 		request.LimpiezaRespuestaRefactor(respuestaPlan, &plan_completo)
 	}
+
+	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan/`+plan_completo["formato_id"].(string), &respuestaPlan); err == nil {
+		request.LimpiezaRespuestaRefactor(respuestaPlan, &plan_formato)
+	}
+
+	request.GetJson("http://"+beego.AppConfig.String("OikosService")+"/dependencia?query=Id:"+plan_completo["dependencia_id"].(string), &respuestaUnidad)
+
+	unidades_interes := []interface{}{
+		map[string]interface{}{
+			"Id":     respuestaUnidad[0]["Id"],
+			"Nombre": respuestaUnidad[0]["Nombre"].(string),
+		},
+	}
+	unidades_interes_json, _ := json.Marshal(unidades_interes)
+
+	plan_interes := []interface{}{
+		map[string]interface{}{
+			"_id":    plan_formato["_id"],
+			"nombre": plan_formato["nombre"],
+		},
+	}
+	plan_interes_json, _ := json.Marshal(plan_interes)
 
 	periodosMutex := sync.Mutex{}
 	for _, trimestre := range trimestres {
@@ -969,26 +993,22 @@ func GetPeriodosPlan(vigenciaId string, plan_id string) []map[string]interface{}
 				trimestreId := int(trimestre["Id"].(float64))
 				codigoAbreviacion := (trimestre["ParametroId"].(map[string]interface{}))["CodigoAbreviacion"].(string)
 
+				body := map[string]interface{}{
+					"tipo_seguimiento_id": "61f236f525e40c582a0840d0",
+					"periodo_id":          fmt.Sprintf("%v", trimestreId),
+					"unidades_interes":    string(unidades_interes_json),
+					"planes_interes":      string(plan_interes_json),
+				}
+
 				// Trae los periodos de seguimiento que son del trimestre respectivo organizados por la fecha de modificación
-				if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/periodo-seguimiento?query=tipo_seguimiento_id:61f236f525e40c582a0840d0,periodo_id:`+strconv.Itoa(trimestreId)+"&fields=_id,planes_interes,periodo_id&sortby=fecha_modificacion&order=asc", &respuestaPeriodoSeguimiento); err == nil {
+				if err := request.SendJson("http://"+beego.AppConfig.String("PlanesService")+"/periodo-seguimiento/buscar-unidad-planes/1", "POST", &respuestaPeriodoSeguimiento, body); err == nil {
 					var periodosSeguimiento []map[string]interface{}
 					request.LimpiezaRespuestaRefactor(respuestaPeriodoSeguimiento, &periodosSeguimiento)
-					for _, periodo := range periodosSeguimiento {
-						var planes_interes []map[string]interface{}
-						if periodo["planes_interes"] != nil {
-							json.Unmarshal([]byte(periodo["planes_interes"].(string)), &planes_interes)
-							for _, plan_interes := range planes_interes {
-								// Solo agrega los seguimientos que respectan al plan
-								if plan_interes["_id"].(string) == plan_completo["formato_id"] {
-									periodo["codigo_trimestre"] = codigoAbreviacion[len(codigoAbreviacion)-1:]
-									periodosMutex.Lock()
-									// Guarda el periodo de seguimiento que ha sido modificado más recientemente
-									(*periodos) = append((*periodos), periodo)
-									periodosMutex.Unlock()
-								}
-							}
-						}
-					}
+					periodo := periodosSeguimiento[0]
+					periodo["codigo_trimestre"] = codigoAbreviacion[len(codigoAbreviacion)-1:]
+					periodosMutex.Lock()
+					(*periodos) = append((*periodos), periodo)
+					periodosMutex.Unlock()
 				}
 			}(trimestre, &wg, &periodos)
 		}
