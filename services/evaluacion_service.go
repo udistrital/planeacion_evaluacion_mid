@@ -549,7 +549,6 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 
 			resIndicadores := GetEvaluacionTrimestre(planId, trimestre["_id"].(string), actividadId)
 			for _, resIndicador := range resIndicadores {
-
 				indice := -1
 				for index, eval := range evaluacion {
 					if eval["numero"] == actividad["informacion"].(map[string]interface{})["index"] && eval["indicador"] == resIndicador["indicador"] {
@@ -576,6 +575,7 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 					evaluacionAux[trimestreNom] = map[string]interface{}{
 						"acumulado":            resIndicador["acumulado"],
 						"denominador":          resIndicador["denominador"],
+						"tipo_denominador":     resIndicador["tipo_denominador"],
 						"meta":                 resIndicador["meta"],
 						"numerador":            resIndicador["numerador"],
 						"periodo":              resIndicador["periodo"],
@@ -589,6 +589,7 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 					evaluacion[indice][trimestreNom] = map[string]interface{}{
 						"acumulado":            resIndicador["acumulado"],
 						"denominador":          resIndicador["denominador"],
+						"tipo_denominador":     resIndicador["tipo_denominador"],
 						"meta":                 resIndicador["meta"],
 						"numerador":            resIndicador["numerador"],
 						"periodo":              resIndicador["periodo"],
@@ -618,6 +619,16 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 
 		for _, i := range idxs {
 			if fmt.Sprintf("%v", evaluacion[i]["trimestre1"]) != "map[]" {
+				//CALCULO DEL INDICADOR ACUMULADO PARA DENOMINADOR VARIABLE
+				if evaluacion[i]["trimestre1"].(map[string]interface{})["tipo_denominador"] == "Denominador variable" {
+					if evaluacion[i]["trimestre1"].(map[string]interface{})["numeradorAcumulado"].(float64) != 0 && evaluacion[i]["trimestre1"].(map[string]interface{})["denominadorAcumulado"].(float64) != 0 {
+						evaluacion[i]["trimestre1"].(map[string]interface{})["acumulado"] = (evaluacion[i]["trimestre1"].(map[string]interface{})["numeradorAcumulado"].(float64) / evaluacion[i]["trimestre1"].(map[string]interface{})["denominadorAcumulado"].(float64)) * 0.25
+					} else {
+						evaluacion[i]["trimestre1"].(map[string]interface{})["acumulado"] = 1 * 0.25
+					}
+					//CALCULO PARA EL CUMPLIMIENTO POR META
+					evaluacion[i]["trimestre1"].(map[string]interface{})["meta"] = (evaluacion[i]["trimestre1"].(map[string]interface{})["acumulado"].(float64) / evaluacion[i]["meta"].(float64)) * 100
+				}
 				if evaluacion[i]["trimestre1"].(map[string]interface{})["meta"].(float64) > 1 {
 					sum1 = sum1 + 1.0
 				} else {
@@ -625,6 +636,16 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 				}
 			}
 			if fmt.Sprintf("%v", evaluacion[i]["trimestre2"]) != "map[]" {
+				//CALCULO DEL INDICADOR ACUMULADO PARA DENOMINADOR VARIABLE
+				if evaluacion[i]["trimestre2"].(map[string]interface{})["tipo_denominador"] == "Denominador variable" {
+					if evaluacion[i]["trimestre2"].(map[string]interface{})["numeradorAcumulado"].(float64) != 0 && evaluacion[i]["trimestre2"].(map[string]interface{})["denominadorAcumulado"].(float64) != 0 {
+						evaluacion[i]["trimestre2"].(map[string]interface{})["acumulado"] = (evaluacion[i]["trimestre2"].(map[string]interface{})["numeradorAcumulado"].(float64) / evaluacion[i]["trimestre2"].(map[string]interface{})["denominadorAcumulado"].(float64)) * 0.50
+					} else {
+						evaluacion[i]["trimestre2"].(map[string]interface{})["acumulado"] = (evaluacion[i]["trimestre2"].(map[string]interface{})["acumulado"].(float64) + 0.25) * 0.50
+					}
+					//CALCULO PARA EL CUMPLIMIENTO POR META
+					evaluacion[i]["trimestre2"].(map[string]interface{})["meta"] = (evaluacion[i]["trimestre2"].(map[string]interface{})["acumulado"].(float64) / evaluacion[i]["meta"].(float64)) * 100
+				}
 				if evaluacion[i]["trimestre2"].(map[string]interface{})["meta"].(float64) > 1 {
 					sum2 = sum2 + 1.0
 				} else {
@@ -632,6 +653,16 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 				}
 			}
 			if fmt.Sprintf("%v", evaluacion[i]["trimestre3"]) != "map[]" {
+				//CALCULO DEL INDICADOR ACUMULADO PARA DENOMINADOR VARIABLE
+				if evaluacion[i]["trimestre3"].(map[string]interface{})["tipo_denominador"] == "Denominador variable" {
+					if evaluacion[i]["trimestre3"].(map[string]interface{})["numeradorAcumulado"].(float64) != 0 && evaluacion[i]["trimestre3"].(map[string]interface{})["denominadorAcumulado"].(float64) != 0 {
+						evaluacion[i]["trimestre3"].(map[string]interface{})["acumulado"] = (evaluacion[i]["trimestre3"].(map[string]interface{})["numeradorAcumulado"].(float64) / evaluacion[i]["trimestre3"].(map[string]interface{})["denominadorAcumulado"].(float64)) * 0.75
+					} else {
+						evaluacion[i]["trimestre3"].(map[string]interface{})["acumulado"] = (evaluacion[i]["trimestre3"].(map[string]interface{})["acumulado"].(float64) + 0.25) * 0.75
+					}
+					//CALCULO PARA EL CUMPLIMIENTO POR META
+					evaluacion[i]["trimestre3"].(map[string]interface{})["meta"] = (evaluacion[i]["trimestre3"].(map[string]interface{})["acumulado"].(float64) / evaluacion[i]["meta"].(float64)) * 100
+				}
 				if evaluacion[i]["trimestre3"].(map[string]interface{})["meta"].(float64) > 1 {
 					sum3 = sum3 + 1.0
 				} else {
@@ -639,6 +670,16 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 				}
 			}
 			if fmt.Sprintf("%v", evaluacion[i]["trimestre4"]) != "map[]" {
+				//CALCULO DEL INDICADOR ACUMULADO PARA DENOMINADOR VARIABLE
+				if evaluacion[i]["trimestre4"].(map[string]interface{})["tipo_denominador"] == "Denominador variable" {
+					if evaluacion[i]["trimestre4"].(map[string]interface{})["numeradorAcumulado"].(float64) != 0 && evaluacion[i]["trimestre4"].(map[string]interface{})["denominadorAcumulado"].(float64) != 0 {
+						evaluacion[i]["trimestre4"].(map[string]interface{})["acumulado"] = (evaluacion[i]["trimestre4"].(map[string]interface{})["numeradorAcumulado"].(float64) / evaluacion[i]["trimestre4"].(map[string]interface{})["denominadorAcumulado"].(float64))
+					} else {
+						evaluacion[i]["trimestre4"].(map[string]interface{})["acumulado"] = (evaluacion[i]["trimestre4"].(map[string]interface{})["acumulado"].(float64) + 0.25)
+					}
+					//CALCULO PARA EL CUMPLIMIENTO POR META
+					evaluacion[i]["trimestre4"].(map[string]interface{})["meta"] = (evaluacion[i]["trimestre4"].(map[string]interface{})["acumulado"].(float64) / evaluacion[i]["meta"].(float64)) * 100
+				}
 				if evaluacion[i]["trimestre4"].(map[string]interface{})["meta"].(float64) > 1 {
 					sum4 = sum4 + 1.0
 				} else {
@@ -758,6 +799,7 @@ func GetEvaluacionTrimestre(planId string, periodoId string, actividadId string)
 				"unidad":               indicadores[i].(map[string]interface{})["unidad"],
 				"numerador":            indicadores[i].(map[string]interface{})["reporteNumerador"],
 				"denominador":          indicadores[i].(map[string]interface{})["reporteDenominador"],
+				"tipo_denominador":     indicadores[i].(map[string]interface{})["denominador"],
 				"periodo":              resultados[i].(map[string]interface{})["indicador"],
 				"acumulado":            resultados[i].(map[string]interface{})["indicadorAcumulado"],
 				"meta":                 resultados[i].(map[string]interface{})["avanceAcumulado"],
