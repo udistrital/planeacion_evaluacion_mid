@@ -48,7 +48,6 @@ func GetPlanesPeriodo(vigencia string, unidad string) (respuesta []map[string]in
 	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/plan?query=estado_plan_id:6153355601c7a2365b2fb2a1,dependencia_id:`+unidad+`,vigencia:`+vigencia, &resPlan); err == nil {
 		planes := make([]map[string]interface{}, 1)
 		request.LimpiezaRespuestaRefactor(resPlan, &planes)
-		// formatdata.JsonPrint(planes)
 		if fmt.Sprintf("%v", planes) == "[]" {
 			outputError = map[string]interface{}{
 				"funcion": "No se tienen planes en seguimiento para la dependencia y la vigencia",
@@ -61,17 +60,23 @@ func GetPlanesPeriodo(vigencia string, unidad string) (respuesta []map[string]in
 
 		for _, plan := range planes {
 			periodos := GetPeriodosPlan(vigencia, plan["_id"].(string))
-			if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=tipo_seguimiento_id:61f236f525e40c582a0840d0,estado_seguimiento_id:622ba49216511e93a95c326d,plan_id:`+plan["_id"].(string), &resSeguimiento); err == nil {
-				seguimientos := make([]map[string]interface{}, 1)
-				request.LimpiezaRespuestaRefactor(resSeguimiento, &seguimientos)
+			if err := request.GetJson("http://"+beego.AppConfig.String("SeguimientoService")+`/seguimiento/`+plan["_id"].(string), &resSeguimiento); err == nil {
+				var seguimientos []interface{}
+				if resSeguimiento["data"] == nil {
+					continue
+				}
+				seguimientos = resSeguimiento["data"].([]interface{})
 				if fmt.Sprintf("%v", seguimientos) == "[]" {
 					continue
 				}
 
 				var periodosSelecionados []map[string]interface{}
 				for _, seguimiento := range seguimientos {
+					if seguimiento.(map[string]interface{})["estado_seguimiento_id"] != "622ba49216511e93a95c326d" {
+						continue
+					}
 					for _, periodo := range periodos {
-						if seguimiento["periodo_seguimiento_id"] == periodo["_id"] {
+						if seguimiento.(map[string]interface{})["periodo_seguimiento_id"] == periodo["_id"] {
 							for _, trimestre := range trimestres {
 								var trimestreId float64
 								if reflect.TypeOf(trimestre["Id"]).String() == "string" {
@@ -87,7 +92,7 @@ func GetPlanesPeriodo(vigencia string, unidad string) (respuesta []map[string]in
 								}
 
 								if trimestreId == periodoId {
-									periodosSelecionados = append(periodosSelecionados, map[string]interface{}{"nombre": trimestre["ParametroId"].(map[string]interface{})["Nombre"].(string), "id": periodo["_id"]})
+									periodosSelecionados = append(periodosSelecionados, map[string]interface{}{"nombre": trimestre["ParametroId"].(map[string]interface{})["Nombre"].(string), "id": periodo["_id"], "plan_id": seguimiento.(map[string]interface{})["plan_id"]})
 									break
 								}
 							}
@@ -95,7 +100,9 @@ func GetPlanesPeriodo(vigencia string, unidad string) (respuesta []map[string]in
 						}
 					}
 				}
-				respuesta = append(respuesta, map[string]interface{}{"plan": plan["nombre"], "id": plan["_id"], "periodos": periodosSelecionados})
+				if len(periodosSelecionados) != 0 {
+					respuesta = append(respuesta, map[string]interface{}{"plan": plan["nombre"], "id": plan["_id"], "periodos": periodosSelecionados})
+				}
 			} else {
 				outputError = map[string]interface{}{
 					"err":    err,
@@ -484,17 +491,26 @@ func PlanesAEvaluar() (planes []string, outputError error) {
 }
 
 func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, posicionTrimestre int) []map[string]interface{} {
-	var resSeguimiento map[string]interface{}
+	var resSeguimientosPlan map[string]interface{}
+	var seguimientos []interface{}
 	var seguimiento map[string]interface{}
 	var evaluacion []map[string]interface{}
 
 	actividades := make(map[string]interface{})
 
-	if err := request.GetJson("http://"+beego.AppConfig.String("PlanesService")+`/seguimiento?query=estado_seguimiento_id:622ba49216511e93a95c326d,plan_id:`+planId+`,periodo_seguimiento_id:`+trimestres[posicionTrimestre]["_id"].(string), &resSeguimiento); err != nil {
-		return nil
+	if err := request.GetJson("http://"+beego.AppConfig.String("SeguimientoService")+`/seguimiento/`+planId, &resSeguimientosPlan); err == nil {
+		if resSeguimientosPlan["data"] == nil {
+			return nil
+		}
+		seguimientos = resSeguimientosPlan["data"].([]interface{})
 	}
-	aux := make([]map[string]interface{}, 1)
-	request.LimpiezaRespuestaRefactor(resSeguimiento, &aux)
+	aux := make([]map[string]interface{}, 0)
+
+	for _, seg := range seguimientos {
+		if seg.(map[string]interface{})["periodo_seguimiento_id"] == trimestres[posicionTrimestre]["_id"].(string) {
+			aux = append(aux, seg.(map[string]interface{}))
+		}
+	}
 	if fmt.Sprintf("%v", aux) == "[]" {
 		return nil
 	}
@@ -534,12 +550,16 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 					if nombre, ok := param["Nombre"].(string); ok {
 						if nombre == "Trimestre Uno" {
 							trimestreNom = "trimestre1"
+							planId = seguimientos[0].(map[string]interface{})["plan_id"].(string)
 						} else if nombre == "Trimestre Dos" {
 							trimestreNom = "trimestre2"
+							planId = seguimientos[1].(map[string]interface{})["plan_id"].(string)
 						} else if nombre == "Trimestre Tres" {
 							trimestreNom = "trimestre3"
+							planId = seguimientos[2].(map[string]interface{})["plan_id"].(string)
 						} else if nombre == "Trimestre Cuatro" {
 							trimestreNom = "trimestre4"
+							planId = seguimientos[3].(map[string]interface{})["plan_id"].(string)
 						}
 					}
 				}
