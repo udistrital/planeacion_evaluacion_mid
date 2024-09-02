@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 
 	"github.com/astaxie/beego"
@@ -62,4 +63,16 @@ func FiltrarArreglo(data []map[string]interface{}, condicion func(map[string]int
 		}
 	}
 	return fltd
+}
+
+func DecodeBase64(encoded string) (string, error) {
+	// Decodifica la cadena Base64
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", err
+	}
+
+	// Convierte los bytes UTF-8 en una cadena
+	decodedStr := string(data)
+	return decodedStr, nil
 }

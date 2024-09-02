@@ -143,7 +143,12 @@ func GetEvaluacion(vigencia string, plan string, periodoId string) (interface{},
 }
 
 func Unidades(plan string, vigencia string) (interface{}, error) {
-	if nombrePlan, err := url.QueryUnescape(plan); err == nil {
+  planDecoded, err1 := evaluacionhelper.DecodeBase64(plan)
+  if err1 != nil {
+		errors.New("Error al decodificar en Base64:" + err1.Error())
+	}
+
+	if nombrePlan, err := url.QueryUnescape(planDecoded); err == nil {
 		if data, err := GetUnidadesPorPlanYVigencia(nombrePlan, vigencia); err == nil {
 			return data, nil
 		} else {
