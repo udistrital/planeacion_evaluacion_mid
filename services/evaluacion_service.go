@@ -505,9 +505,8 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 		seguimientos = resSeguimientosPlan["data"].([]interface{})
 	}
 	aux := make([]map[string]interface{}, 0)
-
 	for _, seg := range seguimientos {
-		if seg.(map[string]interface{})["periodo_seguimiento_id"] == trimestres[posicionTrimestre]["_id"].(string) {
+		if seg.(map[string]interface{})["plan_id"] == planId && seg.(map[string]interface{})["periodo_seguimiento_id"] == trimestres[posicionTrimestre]["_id"].(string) && seg.(map[string]interface{})["estado_seguimiento_id"] == "622ba49216511e93a95c326d" {
 			aux = append(aux, seg.(map[string]interface{}))
 		}
 	}
@@ -592,6 +591,7 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 					evaluacionAux["unidad"] = resIndicador["unidad"]
 					evaluacionAux["formula"] = resIndicador["formula"]
 					evaluacionAux["meta"] = resIndicador["metaA"].(float64)
+					evaluacionAux["planId"] = planId
 					evaluacionAux[trimestreNom] = map[string]interface{}{
 						"acumulado":            resIndicador["acumulado"],
 						"denominador":          resIndicador["denominador"],
@@ -625,10 +625,12 @@ func GetEvaluacionInterno(planId string, trimestres []map[string]interface{}, po
 	request.SortSlice(&evaluacion, "numero")
 	agrupacion_actividades := make(map[string][]int)
 	for i, eval := range evaluacion {
-		if _, ok := agrupacion_actividades[eval["numero"].(string)]; !ok {
-			agrupacion_actividades[eval["numero"].(string)] = []int{}
+		if eval["numero"] != nil {
+			if _, ok := agrupacion_actividades[eval["numero"].(string)]; !ok {
+				agrupacion_actividades[eval["numero"].(string)] = []int{}
+			}
+			agrupacion_actividades[eval["numero"].(string)] = append(agrupacion_actividades[eval["numero"].(string)], i)
 		}
-		agrupacion_actividades[eval["numero"].(string)] = append(agrupacion_actividades[eval["numero"].(string)], i)
 	}
 
 	for _, idxs := range agrupacion_actividades {
