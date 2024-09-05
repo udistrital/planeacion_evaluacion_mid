@@ -67,7 +67,7 @@ func FiltrarArreglo(data []map[string]interface{}, condicion func(map[string]int
 
 func DecodeBase64(encoded string) (string, error) {
 	// Decodifica la cadena Base64
-	data, err := base64.StdEncoding.DecodeString(encoded)
+	data, err := base64.RawURLEncoding.DecodeString(encoded)
 	if err != nil {
 		return "", err
 	}
