@@ -143,8 +143,8 @@ func GetEvaluacion(vigencia string, plan string, periodoId string) (interface{},
 }
 
 func Unidades(plan string, vigencia string) (interface{}, error) {
-  planDecoded, err1 := evaluacionhelper.DecodeBase64(plan)
-  if err1 != nil {
+	planDecoded, err1 := evaluacionhelper.DecodeBase64(plan)
+	if err1 != nil {
 		errors.New("Error al decodificar en Base64:" + err1.Error())
 	}
 
