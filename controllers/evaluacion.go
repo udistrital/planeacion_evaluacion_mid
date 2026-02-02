@@ -10,7 +10,6 @@ import (
 // EvaluacionController operations for Evaluacion
 type EvaluacionController struct {
 	beego.Controller
-	
 }
 
 // URLMapping ...
